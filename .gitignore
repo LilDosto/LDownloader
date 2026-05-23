@@ -1,0 +1,18 @@
+# PyInstaller & Build outputs
+build/
+dist/
+*.spec
+
+# Python temporary and cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Runtime logs and cookies
+temp.txt
+cookies.txt
+
+# OS specific files
+.DS_Store
+Thumbs.db

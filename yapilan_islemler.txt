@@ -1,0 +1,170 @@
+================================================================================
+       yt-dlp İndirici — EXE Paketleme İşlemleri (Detaylı Rapor)
+================================================================================
+Tarih: 05 Mart 2026, 15:36 - 15:40
+
+================================================================================
+1. PROJE ANALİZİ
+================================================================================
+
+Projede mevcut dosyalar incelendi:
+
+  - ytdlp_gui.pyw    (545 satır) → Ana uygulama kodu (Tkinter GUI)
+  - ytdlp_gui.py     (545 satır) → Aynı dosyanın .py kopyası
+  - logo.ico          (2.6 KB)   → Uygulama ikonu (ICO formatı)
+  - logo.png          (1.1 KB)   → Arayüzde gösterilen logo (PNG formatı)
+  - logo_16.png       (254 B)    → 16px logo
+  - logo_32.png       (590 B)    → 32px logo
+  - logo_48.png       (875 B)    → 48px logo
+  - logo_64.png       (1.1 KB)   → 64px logo
+  - cookies.txt       (92 KB)    → YouTube çerez dosyası
+  - make_icon.py      (778 B)    → İkon oluşturma scripti
+  - ytdlp.bat         (941 B)    → Batch başlatıcı
+
+================================================================================
+2. PyInstaller KURULUMU
+================================================================================
+
+Komut:
+  pip install pyinstaller
+
+Kurulan paketler:
+  - pyinstaller 6.19.0
+  - pyinstaller-hooks-contrib 2026.2
+  - altgraph 0.17.5
+  - packaging 26.0
+  - pefile 2024.8.26
+  - pywin32-ctypes 0.2.3
+  - setuptools 82.0.0
+
+================================================================================
+3. KAYNAK KOD DEĞİŞİKLİKLERİ (ytdlp_gui.pyw)
+================================================================================
+
+3.1 — _APP_DIR Güncellenmesi (Satır 34)
+----------------------------------------
+
+SORUN:
+  Orijinal kodda kaynak dosyaların yolu şu şekilde bulunuyordu:
+
+    _APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
+  PyInstaller ile --onefile modunda paketlendiğinde, __file__ geçici bir
+  dizini gösterir ve logo.png, logo.ico gibi dosyalar bulunamaz.
+
+ÇÖZÜM:
+  İki ayrı fonksiyon eklendi:
+
+  a) _get_app_dir() — Gömülü kaynaklar için (logo.png, logo.ico):
+     - PyInstaller ile çalışıyorsa: sys._MEIPASS (geçici çıkarma dizini)
+     - Normal Python ile çalışıyorsa: __file__ dizini
+
+  b) _get_exe_dir() — Kullanıcı dosyaları için (cookies.txt):
+     - PyInstaller ile çalışıyorsa: sys.executable dizini (exe'nin konumu)
+     - Normal Python ile çalışıyorsa: __file__ dizini
+
+  Eklenen kod:
+
+    def _get_app_dir():
+        """PyInstaller ile paketlendiğinde kaynak dosyaları bulmak için."""
+        if getattr(sys, 'frozen', False):
+            return sys._MEIPASS
+        return os.path.dirname(os.path.abspath(__file__))
+
+    _APP_DIR = _get_app_dir()
+
+    def _get_exe_dir():
+        """EXE'nin bulunduğu dizin (cookies.txt gibi kullanıcı dosyaları için)."""
+        if getattr(sys, 'frozen', False):
+            return os.path.dirname(sys.executable)
+        return os.path.dirname(os.path.abspath(__file__))
+
+    _EXE_DIR = _get_exe_dir()
+
+
+3.2 — cookies.txt Yolunun Güncellenmesi (2 yer)
+-------------------------------------------------
+
+SORUN:
+  cookies.txt hem tekil indirme hem playlist indirme fonksiyonlarında
+  şu şekilde aranıyordu:
+
+    cookies_file = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "cookies.txt"
+    )
+
+  EXE olarak çalıştırıldığında bu yol geçici dizini gösterir ve
+  cookies.txt bulunamaz.
+
+ÇÖZÜM:
+  Her iki yerde de _EXE_DIR kullanıldı:
+
+    cookies_file = os.path.join(_EXE_DIR, "cookies.txt")
+
+  Değişen fonksiyonlar:
+    - _start_single()   (tekil indirme)
+    - _start_playlist() (playlist indirme)
+
+  Bu sayede cookies.txt, exe dosyasının yanına konulduğunda otomatik
+  olarak bulunur.
+
+================================================================================
+4. PyInstaller İLE EXE OLUŞTURMA
+================================================================================
+
+Kullanılan komut:
+
+  pyinstaller --noconfirm --onefile --windowed --icon="logo.ico"
+    --name="ytdlp_indirici"
+    --add-data="logo.png;."
+    --add-data="logo.ico;."
+    --add-data="logo_16.png;."
+    --add-data="logo_32.png;."
+    --add-data="logo_48.png;."
+    --add-data="logo_64.png;."
+    ytdlp_gui.pyw
+
+Parametrelerin açıklamaları:
+
+  --noconfirm       : Önceki build dosyalarını sormadan üzerine yaz
+  --onefile          : Tek bir .exe dosyası oluştur (tüm bağımlılıklar içinde)
+  --windowed         : Konsol penceresi açılmasın (GUI uygulaması)
+  --icon="logo.ico"  : EXE dosyasının ikonu olarak logo.ico kullan
+  --name="ytdlp_indirici" : Çıktı dosyasının adı
+  --add-data="X;."   : X dosyasını exe içine göm (çalıştırıldığında çıkarılır)
+
+================================================================================
+5. SONUÇ
+================================================================================
+
+Oluşturulan dosya:
+  dist\ytdlp_indirici.exe  (~11 MB)
+
+Özellikler:
+  ✅ Tek dosya (onefile) — tüm bağımlılıklar exe içinde
+  ✅ Logo.ico exe'nin ikonu olarak gömülü (Dosya Gezgini'nde görünür)
+  ✅ Logo.png arayüzde başlıkta gösterilir
+  ✅ Konsol penceresi açılmaz (windowed mod)
+  ✅ cookies.txt desteği (exe'nin yanına koyulması yeterli)
+
+Oluşturulan yardımcı dosyalar (silinebilir):
+  - build\             → PyInstaller geçici derleme dosyaları
+  - dist\              → EXE çıktı klasörü
+  - ytdlp_indirici.spec → PyInstaller ayar dosyası
+
+================================================================================
+6. KULLANIM TALİMATLARI
+================================================================================
+
+  1. dist\ytdlp_indirici.exe dosyasını istediğiniz klasöre kopyalayın.
+  2. Eğer YouTube kimlik doğrulaması gerekiyorsa, cookies.txt dosyasını
+     exe ile aynı klasöre koyun.
+  3. yt-dlp'nin sistem PATH'inde kurulu olduğundan emin olun.
+     (Kurulum: pip install yt-dlp)
+  4. EXE'ye çift tıklayarak uygulamayı başlatın.
+
+NOT: İlk açılışta Windows Defender veya antivirüs uyarı verebilir.
+     Bu, PyInstaller ile oluşturulan tüm exe dosyalarında normal bir
+     durumdur. "Yine de çalıştır" seçeneğini kullanabilirsiniz.
+
+================================================================================
