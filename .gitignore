@@ -1,7 +1,6 @@
 # PyInstaller & Build outputs
 build/
 dist/
-*.spec
 
 # Python temporary and cache files
 __pycache__/
@@ -16,3 +15,8 @@ cookies.txt
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# Redundant local logs and utilities
+yapilan_islemler.txt
+ytdlp.bat
+make_icon.py
