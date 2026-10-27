@@ -1,4 +1,4 @@
-# LDownloader v3 🎬🎵
+# LDownloader v3.1 🎬🎵
 
 **LDownloader**, Python, Tkinter ve `yt-dlp` tabanlı, koyu temalı bir Windows masaüstü video ve ses indirme uygulamasıdır. Kullanılabilir platformlar ve formatlar, kaynak içeriğe ve `yt-dlp` desteğine bağlıdır.
 
