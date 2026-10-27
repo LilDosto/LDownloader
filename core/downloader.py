@@ -81,6 +81,7 @@ class DownloadEngine:
         try:
             env = os.environ.copy()
             env["PYTHONIOENCODING"] = "utf-8"
+            env["PYTHONUNBUFFERED"] = "1"
             from core.config import get_bin_dir
             b_dir = get_bin_dir()
             if b_dir and b_dir not in env.get("PATH", ""):
@@ -119,6 +120,26 @@ class DownloadEngine:
                         last_destination = dest
                         self._current_file = dest
 
+                # Durum / Aşama güncellemesi
+                if line.startswith("[ExtractAudio]"):
+                    if cb.get("on_status"):
+                        cb["on_status"]("Ses dönüştürülüyor...")
+                elif line.startswith("[Merger]"):
+                    if cb.get("on_status"):
+                        cb["on_status"]("Formatlar birleştiriliyor...")
+                elif line.startswith(("[EmbedThumbnail]", "[ThumbnailsConvertor]")):
+                    if cb.get("on_status"):
+                        cb["on_status"]("Kapak resmi ekleniyor...")
+                elif line.startswith("[Metadata]"):
+                    if cb.get("on_status"):
+                        cb["on_status"]("Üstveri ekleniyor...")
+                elif line.startswith("[SponsorBlock]"):
+                    if cb.get("on_status"):
+                        cb["on_status"]("Sponsorlu bölümler kesiliyor...")
+                elif line.startswith("[download] Destination:"):
+                    if cb.get("on_status"):
+                        cb["on_status"]("İndiriliyor...")
+
                 # 2. İlerleme ayrıştırma
                 parsed = self._parse_progress(line, cb.get("on_progress"))
 
@@ -138,7 +159,8 @@ class DownloadEngine:
                 elif "[download] 100%" in line or "100% of" in line:
                     tag = "success"
 
-                if cb.get("on_log") and not line.startswith("[PROGRESS]"):
+                is_progress_line = line.startswith("[PROGRESS]") or (parsed and bool(self._DL_RE.search(line)))
+                if cb.get("on_log") and not is_progress_line:
                     cb["on_log"](line, tag)
 
             self._proc.wait()
@@ -173,7 +195,7 @@ class DownloadEngine:
 
                 speed = "—" if not speed or any(x in speed.lower() for x in ["unknown", "na", "—"]) else speed
                 total = "—" if not total or any(x in total.lower() for x in ["unknown", "na", "—"]) else total
-                eta = "—" if not eta or any(x in eta.lower() for x in ["unknown", "na", "—"]) else eta
+                eta = "—" if not eta or any(x in eta.lower() for x in ["unknown", "na", "—"]) or "" in eta else eta
 
                 on_progress(pct, speed, total, eta)
                 return True
@@ -334,11 +356,15 @@ def build_command(url, output_dir, options):
         cmd += ["-o", os.path.join(output_dir, "%(title)s.%(ext)s")]
 
     # Kararlı ilerleme şablonu ve nihai dosya yolu çıktısı
+    # NOT: yt-dlp'de --print bayrağı varsayılan olarak --quiet ve --no-progress modunu tetikler.
+    # Bu yüzden --progress ve --no-quiet açıkça eklenmelidir ki konsol ve ilerleme çubuğu çalışsın.
     cmd += [
-        "--progress-template",
-        "download:[PROGRESS] %(progress._percent_str)s | %(progress._speed_str)s | %(progress._total_bytes_str)s | %(progress._eta_str)s",
         "--print",
-        "after_move:[FINAL_PATH] %(filepath)s"
+        "after_move:[FINAL_PATH] %(filepath)s",
+        "--progress",
+        "--no-quiet",
+        "--progress-template",
+        "download:[PROGRESS] %(progress._percent_str)s | %(progress._speed_str)s | %(progress._total_bytes_str)s | %(progress._eta_str)s"
     ]
 
     cmd.append(url)

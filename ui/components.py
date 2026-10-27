@@ -606,6 +606,7 @@ class ContextualDownloadDrawer(tk.Frame):
         self.log_text.tag_config("accent", foreground=ACCENT_LIGHT)
 
     def show(self, title="İndirme", clear_logs=True):
+        self._base_title = title
         self.lbl_title.config(text=f"⏳ {title}")
         self.pbar["value"] = 0
         self.pct_var.set("0%")
@@ -619,7 +620,18 @@ class ContextualDownloadDrawer(tk.Frame):
         self.btn_open.pack_forget()
         self.btn_close.pack_forget()
         self.btn_cancel.pack(side="left", padx=(0, 6), before=self.btn_console_toggle)
-        self.pack(fill="x", side="bottom")
+        parent_container = getattr(self.master, "content_container", None)
+        if parent_container and parent_container.winfo_ismapped():
+            self.pack(fill="x", side="bottom", before=parent_container)
+        else:
+            self.pack(fill="x", side="bottom")
+
+    def set_phase(self, phase_text):
+        base = getattr(self, "_base_title", None)
+        if base:
+            self.lbl_title.config(text=f"⏳ {base} · {phase_text}")
+        else:
+            self.lbl_title.config(text=f"⏳ {phase_text}")
 
     def hide(self):
         self.pack_forget()

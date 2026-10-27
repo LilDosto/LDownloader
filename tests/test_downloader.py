@@ -129,6 +129,26 @@ class BuildCommandTests(unittest.TestCase):
         self.assertIn("--download-sections", cmd)
         self.assertIn("*01:20-03:45", cmd)
 
+    def test_progress_and_no_quiet_flags_present(self):
+        cmd = build_command(
+            "https://example.com/video",
+            "C:\\Downloads",
+            {"mode": "single"}
+        )
+        self.assertIn("--progress", cmd)
+        self.assertIn("--no-quiet", cmd)
+        self.assertIn("--progress-template", cmd)
+        self.assertIn("--print", cmd)
+
+        # Verify yt-dlp option parser preserves quiet=False and noprogress=False
+        try:
+            import yt_dlp
+            parsed = yt_dlp.parse_options(cmd[1:])
+            self.assertFalse(parsed.ydl_opts.get("quiet", False))
+            self.assertFalse(parsed.ydl_opts.get("noprogress", False))
+        except ImportError:
+            pass
+
     def test_clip_section_range_validation(self):
         self.assertIsNone(clip_section_range("", ""))
         self.assertEqual(clip_section_range("01:20", "03:45"), "*01:20-03:45")

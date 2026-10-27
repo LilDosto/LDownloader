@@ -604,6 +604,9 @@ class LDownloaderApp(tk.Tk):
         def _on_log(line, tag):
             self.after(0, lambda: self.drawer.log_line(line, tag))
 
+        def _on_status(msg):
+            self.after(0, lambda: self.drawer.set_phase(msg))
+
         def _on_complete(success, output_path, err, cancelled):
             self.current_download_file = output_path
             self.after(0, lambda: self.drawer.on_complete_status(success, output_path, err, cancelled))
@@ -615,6 +618,7 @@ class LDownloaderApp(tk.Tk):
         callbacks = {
             "on_progress": _on_progress,
             "on_log": _on_log,
+            "on_status": _on_status,
             "on_complete": _on_complete
         }
         engine.start_download(cmd, callbacks)
@@ -626,6 +630,9 @@ class LDownloaderApp(tk.Tk):
         def _on_log(line, tag):
             self.after(0, lambda: self.drawer.log_line(line, tag))
 
+        def _on_status(msg):
+            self.after(0, lambda: self.drawer.set_phase(msg))
+
         def _on_complete(success, output_path, err, cancelled):
             if done_callback:
                 done_callback(success, output_path, err, cancelled)
@@ -633,6 +640,7 @@ class LDownloaderApp(tk.Tk):
         callbacks = {
             "on_progress": _on_progress,
             "on_log": _on_log,
+            "on_status": _on_status,
             "on_complete": _on_complete
         }
         return engine.start_download(cmd, callbacks)
