@@ -1,8 +1,8 @@
-# LDownloader 🎬🎵 v2.0 PRO
+# LDownloader v3 🎬🎵
 
 **LDownloader**, Python, Tkinter ve `yt-dlp` tabanlı, koyu temalı bir Windows masaüstü video ve ses indirme uygulamasıdır. Kullanılabilir platformlar ve formatlar, kaynak içeriğe ve `yt-dlp` desteğine bağlıdır.
 
-![LDownloader Logo](logo.png)
+![LDownloader Logo](assets/logo.png)
 
 ---
 
@@ -64,13 +64,12 @@ LDownloader/
 │   │   ├── history_tab.py     # İndirme geçmişi sekmesi
 │   │   └── settings_tab.py    # Ayarlar, çerezler ve bağımlılık yöneticisi
 │   └── app.py                 # Ana pencere ve sekme orkestrasyonu
-├── ytdlp_gui.pyw              # Ana çalıştırma dosyası (Geriye dönük %100 uyumlu)
-├── main.py                    # Alternatif çalıştırma noktası
-├── ytdlp_indirici.spec        # PyInstaller derleme yapılandırması
-├── build_exe.bat              # Tek tıkla Windows EXE derleme aracı
-├── requirements.txt           # Python bağımlılıkları
-├── logo.ico / logo.png        # Görsel ikonlar
-└── README.md                  # Dokümantasyon
+├── assets/                     # Görsel ikonlar (logo.ico, logo.png)
+├── main.py                     # Ana uygulama başlatıcısı
+├── ytdlp_indirici.spec         # PyInstaller derleme yapılandırması
+├── build_exe.bat               # Tek tıkla Windows EXE derleme aracı
+├── requirements.txt            # Python bağımlılıkları
+└── README.md                   # Dokümantasyon
 ```
 
 ---
@@ -89,9 +88,8 @@ pip install -r requirements.txt
 
 ### 2. Uygulamayı Başlatın:
 ```bash
-python ytdlp_gui.pyw
+python main.py
 ```
-*(veya `python main.py`)*
 
 ---
 

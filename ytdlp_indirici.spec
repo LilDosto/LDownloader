@@ -1,12 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 a = Analysis(
-    ['ytdlp_gui.pyw'],
+    ['main.py'],
     pathex=['.'],
     binaries=[],
     datas=[
-        ('logo.png', '.'),
-        ('logo.ico', '.')
+        ('assets/logo.png', 'assets'),
+        ('assets/logo.ico', 'assets')
     ],
     hiddenimports=[
         'yt_dlp',
@@ -67,5 +67,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['logo.ico'],
+    icon=['assets/logo.ico'],
 )

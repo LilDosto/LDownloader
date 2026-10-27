@@ -14,7 +14,7 @@ from ui.theme import (
 
 class Card(tk.Frame):
     """Quiet surface container with a thin, low-contrast edge."""
-    def __init__(self, parent, padx=20, pady=16, **kwargs):
+    def __init__(self, parent, padx=22, pady=16, **kwargs):
         super().__init__(
             parent,
             bg=SURFACE,
@@ -34,13 +34,14 @@ class PillButton(tk.Frame):
         self.normal_bg, self.hover_bg, self.normal_fg, self.border_col = self._get_colors(style)
 
         font = FONT_SMALL_BOLD if small else FONT_BOLD
-        padx = 13 if small else (20 if style in ("primary", "accent", "danger") else 16)
-        pady = 7 if small else (11 if style in ("primary", "accent", "danger") else 9)
+        padx = 14 if small else (22 if style in ("primary", "accent", "danger") else 16)
+        pady = 6 if small else (10 if style in ("primary", "accent", "danger") else 8)
 
         super().__init__(
             parent,
             bg=self.normal_bg,
-            highlightthickness=0,
+            highlightthickness=1,
+            highlightbackground=self.border_col,
             **kwargs
         )
         self.command = command
@@ -63,15 +64,15 @@ class PillButton(tk.Frame):
 
     def _get_colors(self, style):
         if style in ("primary", "accent"):
-            return ACCENT, ACCENT_HOVER, "#ffffff", ACCENT_LIGHT
+            return ACCENT, ACCENT_HOVER, "#ffffff", ACCENT_GRADIENT
         elif style == "danger":
             return ERROR, DANGER_HOVER, "#ffffff", ERROR
         elif style == "success":
             return SUCCESS, SUCCESS_HOVER, "#ffffff", SUCCESS
         elif style == "ghost":
-            return SURFACE, SURFACE_HOVER, SUBTEXT, SURFACE
+            return SURFACE, SURFACE_HOVER, SUBTEXT, BORDER
         else:  # secondary
-            return SURFACE_LIGHT, SURFACE_HOVER, TEXT, SURFACE_LIGHT
+            return SURFACE_LIGHT, SURFACE_HOVER, TEXT, BORDER
 
     def _on_click(self, event=None):
         if not self._disabled and self.command:
@@ -94,9 +95,11 @@ class PillButton(tk.Frame):
             state = kw.pop("state")
             self._disabled = (state == "disabled")
             if self._disabled:
-                self.inner.config(fg=MUTED, cursor="")
+                self.inner.config(fg=MUTED, bg=SURFACE_LIGHT, cursor="")
+                super().config(bg=SURFACE_LIGHT)
             else:
-                self.inner.config(fg=self.normal_fg, cursor="hand2")
+                self.inner.config(fg=self.normal_fg, bg=self.normal_bg, cursor="hand2")
+                super().config(bg=self.normal_bg)
         if "style" in kw:
             self.set_style(kw.pop("style"))
         if "command" in kw:
@@ -117,15 +120,17 @@ class PillButton(tk.Frame):
 class PillChip(tk.Frame):
     """Modern tıklanabilir aç/kapa ayar etiketi (çip)."""
     def __init__(self, parent, text, initial_value=False, on_toggle=None, **kwargs):
-        super().__init__(parent, bg=SURFACE_LIGHT, padx=12, pady=7, cursor="hand2", **kwargs)
+        super().__init__(parent, bg=SURFACE_LIGHT, padx=12, pady=6, cursor="hand2", **kwargs)
         self.text = text
         self.value = initial_value
         self.on_toggle = on_toggle
 
         bg_col = ACCENT_MUTED if self.value else SURFACE_LIGHT
+        bdr_col = ACCENT if self.value else BORDER
 
         self.config(
-            highlightthickness=0,
+            highlightthickness=1,
+            highlightbackground=bdr_col,
             bg=bg_col
         )
 
@@ -153,19 +158,20 @@ class PillChip(tk.Frame):
     def _update_state(self):
         bg_col = ACCENT_MUTED if self.value else SURFACE_LIGHT
         fg_col = ACCENT_LIGHT if self.value else SUBTEXT
+        bdr_col = ACCENT if self.value else BORDER
         prefix = "✓ " if self.value else ""
 
-        self.config(bg=bg_col)
+        self.config(bg=bg_col, highlightbackground=bdr_col)
         self.label.config(bg=bg_col, fg=fg_col, text=f"{prefix}{self.text}")
 
     def _on_enter(self, event=None):
         if not self.value:
-            self.config(bg=SURFACE_HOVER)
+            self.config(bg=SURFACE_HOVER, highlightbackground=BORDER_FOCUS)
             self.label.config(bg=SURFACE_HOVER, fg=TEXT)
 
     def _on_leave(self, event=None):
         if not self.value:
-            self.config(bg=SURFACE_LIGHT)
+            self.config(bg=SURFACE_LIGHT, highlightbackground=BORDER)
             self.label.config(bg=SURFACE_LIGHT, fg=SUBTEXT)
 
     def get(self):
@@ -231,11 +237,60 @@ class ModernEntry(tk.Entry):
 
     def set_text(self, text):
         self.delete(0, "end")
-        self.insert(0, text)
-        self.config(fg=TEXT)
-        self.has_placeholder = False
+        if text:
+            self.insert(0, text)
+            self.config(fg=TEXT)
+            self.has_placeholder = False
+        elif self.placeholder:
+            self._apply_placeholder()
         if self.on_change:
-            self.on_change(text)
+            self.on_change(text or "")
+
+
+class ScrollableFrame(tk.Frame):
+    """Dikey kaydırma (fare tekerleği destekli) sağlayan modern kapsayıcı çerçeve."""
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, bg=BG, **kwargs)
+        self.canvas = tk.Canvas(self, bg=BG, bd=0, highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview, style="Vertical.TScrollbar")
+        self.inner = tk.Frame(self.canvas, bg=BG)
+
+        self._win_id = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
+        self.canvas.configure(yscrollcommand=self._on_scroll)
+
+        self.canvas.pack(side="left", fill="both", expand=True)
+
+        self.inner.bind("<Configure>", self._on_inner_configure)
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
+        self.canvas.bind("<Enter>", self._bind_wheel)
+        self.canvas.bind("<Leave>", self._unbind_wheel)
+
+    def _on_scroll(self, first, last):
+        if float(first) <= 0.0 and float(last) >= 1.0:
+            if self.scrollbar.winfo_ismapped():
+                self.scrollbar.pack_forget()
+        else:
+            if not self.scrollbar.winfo_ismapped():
+                self.scrollbar.pack(side="right", fill="y")
+        self.scrollbar.set(first, last)
+
+    def _on_inner_configure(self, event=None):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event):
+        self.canvas.itemconfig(self._win_id, width=event.width)
+
+    def _bind_wheel(self, event=None):
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+    def _unbind_wheel(self, event=None):
+        self.canvas.unbind_all("<MouseWheel>")
+
+    def _on_mousewheel(self, event):
+        first, last = self.canvas.yview()
+        if first <= 0.0 and last >= 1.0:
+            return
+        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
 
 class TabButton(tk.Frame):
@@ -265,7 +320,7 @@ class TabButton(tk.Frame):
         )
         self.lbl_text.pack(side="left")
 
-        self.indicator = tk.Frame(self, bg=TAB_BG, height=2)
+        self.indicator = tk.Frame(self, bg=(ACCENT if is_active else TAB_BG), height=2)
         self.indicator.pack(fill="x", side="bottom")
 
         for w in (self, self.content, self.lbl_icon, self.lbl_text):
@@ -282,7 +337,7 @@ class TabButton(tk.Frame):
         bg_col = TAB_ACTIVE if active else TAB_BG
         fg_col = TEXT if active else SUBTEXT
         icon_col = ACCENT_LIGHT if active else SUBTEXT
-        ind_col = TAB_BG
+        ind_col = ACCENT if active else TAB_BG
         font = FONT_BOLD if active else FONT_REGULAR
 
         self.config(bg=TAB_BG)
@@ -302,10 +357,6 @@ class TabButton(tk.Frame):
             self.content.config(bg=TAB_BG)
             self.lbl_icon.config(bg=TAB_BG, fg=SUBTEXT)
             self.lbl_text.config(bg=TAB_BG, fg=SUBTEXT)
-
-
-# Geriye dönük uyumluluk
-SidebarButton = TabButton
 
 
 class SegmentedPill(tk.Frame):
@@ -372,6 +423,7 @@ class VideoPreviewCard(Card):
     def __init__(self, parent, **kwargs):
         super().__init__(parent, padx=14, pady=10, **kwargs)
         self.thumb_photo = None
+        self.on_playlist_switch = None
 
         # Sol: Thumbnail
         self.thumb_label = tk.Label(
@@ -390,7 +442,7 @@ class VideoPreviewCard(Card):
 
         self.title_label = tk.Label(
             info_frame, text="", bg=SURFACE, fg=TEXT, font=FONT_BOLD,
-            anchor="w", justify="left", wraplength=440
+            anchor="w", justify="left", wraplength=540
         )
         self.title_label.pack(fill="x", anchor="w")
 
@@ -416,7 +468,17 @@ class VideoPreviewCard(Card):
         )
         self.res_count_badge.pack(side="left", padx=(8, 0))
 
-    def update_metadata(self, metadata):
+        self.playlist_badge = PillButton(
+            badge_row, text="📋 Oynatma Listesine Aktar",
+            command=self._on_playlist_click, small=True, style="secondary"
+        )
+
+    def _on_playlist_click(self):
+        if self.on_playlist_switch:
+            self.on_playlist_switch()
+
+    def update_metadata(self, metadata, on_playlist_switch=None):
+        self.on_playlist_switch = on_playlist_switch
         self.title_label.config(text=metadata.get("title", "—"))
         self.uploader_label.config(text=f"👤 {metadata.get('uploader', '—')}")
         self.duration_badge.config(text=f"⏱ {metadata.get('duration', '—')}")
@@ -428,11 +490,20 @@ class VideoPreviewCard(Card):
         else:
             self.res_count_badge.pack_forget()
 
+        if metadata.get("is_playlist") and on_playlist_switch:
+            count = metadata.get("playlist_count", "")
+            cnt_txt = f" ({count} video)" if count and count > 1 else ""
+            self.playlist_badge.config(text=f"📋 Liste Algılandı{cnt_txt} · Listeye Geç")
+            self.playlist_badge.pack(side="left", padx=(8, 0))
+        else:
+            self.playlist_badge.pack_forget()
+
         thumb_img = metadata.get("thumbnail_img")
         if thumb_img:
             self.thumb_photo = ImageTk.PhotoImage(thumb_img)
-            self.thumb_label.config(image=self.thumb_photo, width=160, height=90)
+            self.thumb_label.config(image=self.thumb_photo, text="", width=160, height=90)
         else:
+            self.thumb_photo = None
             self.thumb_label.config(image="", text="Görsel Yok", fg=SUBTEXT, width=20, height=5)
 
 
@@ -534,16 +605,20 @@ class ContextualDownloadDrawer(tk.Frame):
         self.log_text.tag_config("error", foreground=ERROR)
         self.log_text.tag_config("accent", foreground=ACCENT_LIGHT)
 
-    def show(self, title="İndirme"):
+    def show(self, title="İndirme", clear_logs=True):
         self.lbl_title.config(text=f"⏳ {title}")
         self.pbar["value"] = 0
         self.pct_var.set("0%")
         self.speed_var.set("⚡ —")
         self.dl_var.set("📥 —")
         self.eta_var.set("⏱ —")
+        if clear_logs:
+            self.log_text.config(state="normal")
+            self.log_text.delete("1.0", "end")
+            self.log_text.config(state="disabled")
         self.btn_open.pack_forget()
-        self.btn_cancel.pack(side="left", padx=(0, 6))
         self.btn_close.pack_forget()
+        self.btn_cancel.pack(side="left", padx=(0, 6), before=self.btn_console_toggle)
         self.pack(fill="x", side="bottom")
 
     def hide(self):
@@ -567,10 +642,12 @@ class ContextualDownloadDrawer(tk.Frame):
             self.pbar["value"] = 100
             self.pct_var.set("100%")
             self.lbl_title.config(text="✅ İndirme başarıyla tamamlandı!")
-            self.btn_open.pack(side="left", padx=(0, 6))
-            self.btn_close.pack(side="left")
+            self.btn_open.pack(side="left", padx=(0, 6), before=self.btn_console_toggle)
+            self.btn_close.pack(side="left", padx=(6, 0))
         else:
             self.lbl_title.config(text=f"❌ Hata: {error_msg or 'İndirme başarısız oldu'}")
+            if not self.console_open:
+                self._toggle_console()
             self.btn_close.pack(side="left", padx=(6, 0))
 
     def log_line(self, line, tag="info"):

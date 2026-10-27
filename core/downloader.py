@@ -3,7 +3,7 @@ import sys
 import re
 import subprocess
 import threading
-from core.dependencies import find_executable, get_ffmpeg_dir
+from core.dependencies import find_executable, get_ffmpeg_dir, get_ytdlp_cmd
 from core.diagnostics import diagnose
 
 class DownloadEngine:
@@ -15,8 +15,13 @@ class DownloadEngine:
         r"at\s+(?P<speed>.*?)\s+ETA\s+(?P<eta>\S+)"
     )
     _DEST_RE = re.compile(
-        r"\[(?:download|Merger|ExtractAudio|FixupM3u8)\]\s+(?:Destination:\s+|Merging formats into\s+\"|Writing video subtitles to:\s+)(?P<path>[^\"]+)"
+        r"\[(?:download|Merger|ExtractAudio|FixupM3u8|VideoRemuxer|VideoConvertor)\]\s+"
+        r"(?:Destination:\s+|Merging formats into\s+\"|Writing video subtitles to:\s+|Remuxing video from \S+ to\s+\"?)(?P<path>[^\"]+)"
     )
+    _ALREADY_RE = re.compile(
+        r"\[download\]\s+(?P<path>.+?)\s+has already been downloaded"
+    )
+    _FINAL_PATH_PREFIX = "[FINAL_PATH] "
 
     def __init__(self):
         self._proc = None
@@ -99,11 +104,18 @@ class DownloadEngine:
                 if not line:
                     continue
 
+                if line.startswith(self._FINAL_PATH_PREFIX):
+                    final_p = line[len(self._FINAL_PATH_PREFIX):].strip().strip('"')
+                    if final_p and final_p != "NA":
+                        last_destination = final_p
+                        self._current_file = final_p
+                    continue
+
                 # 1. Dosya yolu yakalama
-                m_dest = self._DEST_RE.search(line)
+                m_dest = self._DEST_RE.search(line) or self._ALREADY_RE.search(line)
                 if m_dest:
                     dest = m_dest.group("path").strip().strip('"')
-                    if not dest.endswith((".part", ".ytdl")):
+                    if not dest.endswith((".part", ".ytdl", ".vtt", ".srt", ".ass", ".lrc")):
                         last_destination = dest
                         self._current_file = dest
 
@@ -126,7 +138,7 @@ class DownloadEngine:
                 elif "[download] 100%" in line or "100% of" in line:
                     tag = "success"
 
-                if cb.get("on_log"):
+                if cb.get("on_log") and not line.startswith("[PROGRESS]"):
                     cb["on_log"](line, tag)
 
             self._proc.wait()
@@ -204,8 +216,8 @@ def build_command(url, output_dir, options):
         - speed_limit: str
         - proxy: str
     """
-    ytdlp_exe = find_executable("yt-dlp") or "yt-dlp"
-    cmd = [ytdlp_exe, "--newline"]
+    ytdlp_cmd = get_ytdlp_cmd()
+    cmd = list(ytdlp_cmd) + ["--newline"]
 
     # Yerel FFmpeg kontrolü
     ffmpeg_dir = get_ffmpeg_dir()
@@ -236,7 +248,7 @@ def build_command(url, output_dir, options):
             num_h = height.group(0) if height else "1080"
             if out_format == "mp4":
                 cmd += [
-                    "-f", f"bestvideo[height<={num_h}][ext=mp4]+bestaudio[ext=m4a]/best[height<={num_h}]",
+                    "-f", f"bestvideo[height<={num_h}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={num_h}]+bestaudio/best[height<={num_h}]",
                     "--merge-output-format", "mp4"
                 ]
             else:
@@ -254,8 +266,8 @@ def build_command(url, output_dir, options):
             num_b = bitrate.group(0) if bitrate else "320"
             cmd += ["--audio-quality", f"{num_b}k"]
 
-    # Gelişmiş Seçenekler
-    if options.get("embed_thumbnail", True):
+    # Gelişmiş Seçenekler (Kapak resmi yalnızca desteklenen formatlarda gömülür)
+    if options.get("embed_thumbnail", True) and out_format not in ("wav", "webm"):
         cmd.append("--embed-thumbnail")
 
     if options.get("add_metadata", True):
@@ -285,6 +297,28 @@ def build_command(url, output_dir, options):
     if proxy:
         cmd += ["--proxy", proxy]
 
+    # İndirme Arşivi (--download-archive)
+    if options.get("use_download_archive"):
+        archive_path = options.get("archive_file")
+        if not archive_path:
+            from core.config import get_data_dir
+            archive_path = os.path.join(get_data_dir(), "archive.txt")
+        cmd += ["--download-archive", archive_path]
+
+    # SponsorBlock Entegrasyonu (--sponsorblock-remove)
+    if options.get("sponsorblock_remove"):
+        sb_cats = (options.get("sponsorblock_cats") or "sponsor,intro,outro").strip()
+        if sb_cats:
+            cmd += ["--sponsorblock-remove", sb_cats]
+
+    # Bölüm Kesme / Zaman Aralığı İndirme (--download-sections)
+    clip_section = clip_section_range(
+        options.get("clip_start"),
+        options.get("clip_end")
+    )
+    if clip_section:
+        cmd += ["--download-sections", clip_section]
+
     # Playlist aralığı
     if options.get("mode") == "playlist":
         playlist_range = playlist_items_range(
@@ -299,16 +333,52 @@ def build_command(url, output_dir, options):
         cmd.append("--no-playlist")
         cmd += ["-o", os.path.join(output_dir, "%(title)s.%(ext)s")]
 
-    # Kararlı ilerleme şablonu
+    # Kararlı ilerleme şablonu ve nihai dosya yolu çıktısı
     cmd += [
         "--progress-template",
-        "download:[PROGRESS] %(progress._percent_str)s | %(progress._speed_str)s | %(progress._total_bytes_str)s | %(progress._eta_str)s"
+        "download:[PROGRESS] %(progress._percent_str)s | %(progress._speed_str)s | %(progress._total_bytes_str)s | %(progress._eta_str)s",
+        "--print",
+        "after_move:[FINAL_PATH] %(filepath)s"
     ]
 
     cmd.append(url)
     return cmd
 
 engine = DownloadEngine()
+
+
+_TIME_RE = re.compile(r"^(?:\d+:)?[0-5]?\d:[0-5]\d(?:\.\d+)?$|^\d+(?:\.\d+)?$")
+
+
+def _parse_timestamp_seconds(ts: str) -> float:
+    parts = ts.split(":")
+    if len(parts) == 1:
+        return float(parts[0])
+    if len(parts) == 2:
+        return int(parts[0]) * 60 + float(parts[1])
+    if len(parts) == 3:
+        return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+    raise ValueError("Geçersiz zaman formatı.")
+
+
+def clip_section_range(start, end):
+    """Zaman aralığını doğrular ve yt-dlp --download-sections değerini (*start-end) döndürür."""
+    start = str(start or "").strip()
+    end = str(end or "").strip()
+    if not start and not end:
+        return None
+    if start and not _TIME_RE.match(start):
+        raise ValueError("Başlangıç zamanı geçersiz (Örn: 01:20 veya 00:01:20 girin).")
+    if end and end.lower() != "inf" and not _TIME_RE.match(end):
+        raise ValueError("Bitiş zamanı geçersiz (Örn: 03:45 veya 00:03:45 girin).")
+
+    s_sec = _parse_timestamp_seconds(start) if start else 0.0
+    if end and end.lower() != "inf":
+        e_sec = _parse_timestamp_seconds(end)
+        if e_sec <= s_sec:
+            raise ValueError("Klip bitiş zamanı başlangıç zamanından büyük olmalıdır.")
+
+    return f"*{start or '00:00'}-{end or 'inf'}"
 
 
 def playlist_items_range(start, end):

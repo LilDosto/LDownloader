@@ -27,15 +27,19 @@ from core.dependencies import get_ytdlp_status, get_ffmpeg_status, get_js_status
 class LDownloaderApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("LDownloader v2.0")
-        self.geometry("1080x800")
-        self.minsize(900, 680)
+        self.title("LDownloader v3")
+        self.geometry("980x660")
+        self.minsize(880, 580)
         self.configure(bg=BG)
 
-        # Windows AppUserModelID
+        # Windows Yüksek DPI ve AppUserModelID yapılandırması
         if sys.platform == "win32":
             try:
-                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("ldownloader.modern.gui.2")
+                ctypes.windll.shcore.SetProcessDpiAwareness(1)
+            except Exception:
+                pass
+            try:
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("ldownloader.modern.gui.3")
             except Exception:
                 pass
 
@@ -43,8 +47,8 @@ class LDownloaderApp(tk.Tk):
         self.update_idletasks()
         sw = self.winfo_screenwidth()
         sh = self.winfo_screenheight()
-        width = min(1080, sw - 80)
-        height = min(800, sh - 100)
+        width = min(980, sw - 80)
+        height = min(660, sh - 100)
         x = max(0, (sw - width) // 2)
         y = max(0, (sh - height) // 2)
         self.geometry(f"{width}x{height}+{x}+{y}")
@@ -70,7 +74,9 @@ class LDownloaderApp(tk.Tk):
 
     def _load_icons(self):
         app_dir = get_app_dir()
-        ico_path = os.path.join(app_dir, "logo.ico")
+        ico_path = os.path.join(app_dir, "assets", "logo.ico")
+        if not os.path.isfile(ico_path):
+            ico_path = os.path.join(app_dir, "logo.ico")
         if os.path.isfile(ico_path):
             try:
                 self.iconbitmap(ico_path)
@@ -79,80 +85,71 @@ class LDownloaderApp(tk.Tk):
 
         self.logo_img = None
         self.window_icon_img = None
-        png_path = os.path.join(app_dir, "logo.png")
+        png_path = os.path.join(app_dir, "assets", "logo.png")
+        if not os.path.isfile(png_path):
+            png_path = os.path.join(app_dir, "logo.png")
         if os.path.isfile(png_path):
             try:
                 raw = tk.PhotoImage(file=png_path)
                 self.window_icon_img = raw
                 self.iconphoto(True, raw)
-                factor = max(1, raw.width() // 28)
+                factor = max(1, raw.width() // 24)
                 self.logo_img = raw.subsample(factor, factor)
             except Exception:
                 pass
 
     def _build_layout(self):
-        # ── Üst Başlık Çubuğu (Top Bar) ─────────────────────────────
-        top_bar = tk.Frame(self, bg=TAB_BG, padx=24, pady=14)
+        # ── Birleşik Üst Çubuk (Logo + Sekmeler + Durum) ────────────
+        top_bar = tk.Frame(self, bg=TAB_BG, padx=24, pady=8)
         top_bar.pack(fill="x")
 
         # Sol: Logo + Başlık
         brand_frame = tk.Frame(top_bar, bg=TAB_BG)
-        brand_frame.pack(side="left")
+        brand_frame.pack(side="left", padx=(0, 24))
 
         if self.logo_img:
             tk.Label(brand_frame, image=self.logo_img, bg=TAB_BG).pack(side="left", padx=(0, 8))
 
-        tk.Label(brand_frame, text="LDownloader", font=FONT_TITLE, bg=TAB_BG, fg=TEXT).pack(side="left")
-        badge = tk.Label(
-            brand_frame, text="2.0", font=FONT_SMALL_BOLD, bg=ACCENT_MUTED, fg=ACCENT_LIGHT,
-            padx=8, pady=3
-        )
-        badge.pack(side="left", padx=(10, 0))
+        tk.Label(brand_frame, text="LDownloader v3", font=FONT_TITLE, bg=TAB_BG, fg=TEXT).pack(side="left")
 
-        # Sağ: Sistem durumu
-        self.lbl_sys_status = tk.Label(
-            top_bar, text="● Sistem kontrol ediliyor", bg=ACCENT_MUTED, fg=ACCENT_LIGHT,
-            font=FONT_SMALL_BOLD, anchor="e", padx=12, pady=6
-        )
-        self.lbl_sys_status.pack(side="right")
-        self.btn_theme = PillButton(
-            top_bar,
-            text="Açık tema" if config.get("theme", "dark") == "dark" else "Koyu tema",
-            command=self._toggle_theme,
-            small=True,
-            style="secondary",
-        )
-        self.btn_theme.pack(side="right", padx=(0, 10))
-
-        # ── Tab Navigasyon Çubuğu ────────────────────────────────────
-        tab_bar = tk.Frame(self, bg=TAB_BG)
-        tab_bar.pack(fill="x")
-
-        # Ince ayraç
-        tk.Frame(tab_bar, bg=BORDER, height=1).pack(fill="x", side="top")
-
-        tab_inner = tk.Frame(tab_bar, bg=TAB_BG, padx=20, pady=8)
-        tab_inner.pack(fill="x")
-
+        # Orta: Sekmeler
         self.nav_buttons = {}
         nav_items = [
-            ("single", "▶", "Tekli indirme"),
-            ("playlist", "≡", "Oynatma listesi"),
-            ("batch", "+", "Toplu indirme"),
+            ("single", "▶", "Tekli"),
+            ("playlist", "≡", "Playlist"),
+            ("batch", "+", "Toplu"),
             ("history", "↺", "Geçmiş"),
             ("settings", "⚙", "Ayarlar")
         ]
 
         for key, icon, label in nav_items:
             btn = TabButton(
-                tab_inner,
+                top_bar,
                 icon=icon,
                 text=label,
                 command=lambda k=key: self.switch_tab(k),
                 is_active=(key == "single")
             )
-            btn.pack(side="left", padx=(0, 2))
+            btn.pack(side="left", padx=(0, 4))
             self.nav_buttons[key] = btn
+
+        # Sağ: Sistem durumu + Tema
+        self.lbl_sys_status = tk.Label(
+            top_bar, text="● Kontrol ediliyor", bg=ACCENT_MUTED, fg=ACCENT_LIGHT,
+            font=FONT_SMALL_BOLD, anchor="e", padx=10, pady=5, cursor="hand2",
+            highlightthickness=1, highlightbackground=BORDER
+        )
+        self.lbl_sys_status.pack(side="right")
+        self.lbl_sys_status.bind("<Button-1>", lambda e: self.switch_tab("settings"))
+
+        self.btn_theme = PillButton(
+            top_bar,
+            text="☀" if config.get("theme", "dark") == "dark" else "🌙",
+            command=self._toggle_theme,
+            small=True,
+            style="secondary",
+        )
+        self.btn_theme.pack(side="right", padx=(0, 8))
 
         # Alttaki ince ayraç
         tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
@@ -174,7 +171,11 @@ class LDownloaderApp(tk.Tk):
 
         # Sekmeleri Başlat
         self.tabs = {
-            "single": SingleTab(self.content_container, on_download_requested=self.start_single_download),
+            "single": SingleTab(
+                self.content_container,
+                on_download_requested=self.start_single_download,
+                on_switch_to_playlist=self._transfer_to_playlist
+            ),
             "playlist": PlaylistTab(self.content_container, on_download_requested=self.start_playlist_download),
             "batch": BatchTab(self.content_container, on_batch_requested=self.start_batch_download),
             "history": HistoryTab(self.content_container),
@@ -182,6 +183,12 @@ class LDownloaderApp(tk.Tk):
         }
 
         self.switch_tab("single")
+
+    def _transfer_to_playlist(self, url):
+        playlist = self.tabs.get("playlist")
+        if playlist and url:
+            playlist.url_entry.set_text(url)
+            self.switch_tab("playlist")
 
     def _capture_layout_state(self):
         state = {"active_tab": self.active_tab_name}
@@ -198,6 +205,10 @@ class LDownloaderApp(tk.Tk):
                 "subtitles": single.chip_sub.get(),
                 "thumbnail": single.chip_thumb.get(),
                 "turbo": single.chip_turbo.get(),
+                "sponsorblock": single.chip_sb.get(),
+                "clip_start": single.clip_start_entry.get_clean_text(),
+                "clip_end": single.clip_end_entry.get_clean_text(),
+                "adv_open": single._adv_open,
                 "metadata": single.current_metadata,
             }
 
@@ -207,25 +218,30 @@ class LDownloaderApp(tk.Tk):
                 "url": playlist.url_entry.get_clean_text(),
                 "dir": playlist.dir_var.get(),
                 "media": playlist.media_seg.get(),
+                "video_format": playlist.video_ext_var.get(),
                 "video_quality": playlist.res_var.get(),
+                "audio_format": playlist.audio_ext_var.get(),
                 "audio_quality": playlist.audio_qual_var.get(),
-                "start": playlist.start_var.get(),
-                "end": playlist.end_var.get(),
+                "start": playlist.start_entry.get_clean_text(),
+                "end": playlist.end_entry.get_clean_text(),
                 "ignore_errors": playlist.chip_ignore.get(),
                 "turbo": playlist.chip_turbo.get(),
+                "archive": playlist.chip_archive.get(),
+                "sponsorblock": playlist.chip_sb.get(),
             }
 
         batch = self.tabs.get("batch")
         if batch:
             state["batch"] = {
                 "input": batch.text_input.get("1.0", "end-1c"),
+                "dir": batch.dir_var.get(),
                 "media": batch.media_seg.get(),
                 "queue": [dict(item) for item in batch.queue],
             }
 
         history_tab = self.tabs.get("history")
         if history_tab:
-            state["history_search"] = history_tab.search_var.get()
+            state["history_search"] = history_tab.search_entry.get_clean_text()
 
         state["drawer"] = {
             "visible": bool(self.drawer.winfo_manager()),
@@ -251,29 +267,40 @@ class LDownloaderApp(tk.Tk):
         single.chip_sub.set(single_state.get("subtitles", single.chip_sub.get()))
         single.chip_thumb.set(single_state.get("thumbnail", single.chip_thumb.get()))
         single.chip_turbo.set(single_state.get("turbo", single.chip_turbo.get()))
-        single.url_var.set(single_state.get("url", ""))
+        single.chip_sb.set(single_state.get("sponsorblock", single.chip_sb.get()))
+        if single_state.get("clip_start"):
+            single.clip_start_entry.set_text(single_state["clip_start"])
+        if single_state.get("clip_end"):
+            single.clip_end_entry.set_text(single_state["clip_end"])
+        if single_state.get("adv_open") and not single._adv_open:
+            single._toggle_advanced()
         if single_state.get("url"):
-            single.url_entry.has_placeholder = False
-            single.url_entry.config(fg=TEXT)
+            single._metadata_url = single_state["url"]
+            single.url_entry.set_text(single_state["url"])
         single.current_metadata = None
 
         playlist_state = state.get("playlist", {})
         playlist = self.tabs["playlist"]
         playlist.dir_var.set(playlist_state.get("dir", playlist.dir_var.get()))
         playlist.media_seg.select(playlist_state.get("media", "video"))
+        playlist.video_ext_var.set(playlist_state.get("video_format", playlist.video_ext_var.get()))
         playlist.res_var.set(playlist_state.get("video_quality", playlist.res_var.get()))
+        playlist.audio_ext_var.set(playlist_state.get("audio_format", playlist.audio_ext_var.get()))
         playlist.audio_qual_var.set(playlist_state.get("audio_quality", playlist.audio_qual_var.get()))
-        playlist.start_var.set(playlist_state.get("start", ""))
-        playlist.end_var.set(playlist_state.get("end", ""))
+        if playlist_state.get("start"):
+            playlist.start_entry.set_text(playlist_state["start"])
+        if playlist_state.get("end"):
+            playlist.end_entry.set_text(playlist_state["end"])
         playlist.chip_ignore.set(playlist_state.get("ignore_errors", True))
         playlist.chip_turbo.set(playlist_state.get("turbo", True))
-        playlist.url_var.set(playlist_state.get("url", ""))
+        playlist.chip_archive.set(playlist_state.get("archive", playlist.chip_archive.get()))
+        playlist.chip_sb.set(playlist_state.get("sponsorblock", playlist.chip_sb.get()))
         if playlist_state.get("url"):
-            playlist.url_entry.has_placeholder = False
-            playlist.url_entry.config(fg=TEXT)
+            playlist.url_entry.set_text(playlist_state["url"])
 
         batch_state = state.get("batch", {})
         batch = self.tabs["batch"]
+        batch.dir_var.set(batch_state.get("dir", batch.dir_var.get()))
         batch.media_seg.select(batch_state.get("media", "video"))
         batch.text_input.insert("1.0", batch_state.get("input", ""))
         batch.queue = [dict(item) for item in batch_state.get("queue", [])]
@@ -288,9 +315,12 @@ class LDownloaderApp(tk.Tk):
         if single_state.get("metadata") and single_state.get("url"):
             single._metadata_url = single_state["url"]
             single.current_metadata = single_state["metadata"]
-            single.preview_card.update_metadata(single_state["metadata"])
+            single.preview_card.update_metadata(
+                single_state["metadata"],
+                on_playlist_switch=lambda u=single_state["url"]: self._transfer_to_playlist(u)
+            )
             single.preview_card.pack(
-                fill="x", padx=32, pady=(0, 16), before=single.format_card
+                fill="x", pady=(0, 16), before=single.divider
             )
             resolutions = single_state["metadata"].get("resolutions")
             if resolutions:
@@ -298,9 +328,9 @@ class LDownloaderApp(tk.Tk):
                 single.res_var.set(single_state.get("video_quality", resolutions[0]))
 
         history_state = state.get("history_search")
-        if history_state is not None:
+        if history_state:
             history_tab = self.tabs["history"]
-            history_tab.search_var.set(history_state)
+            history_tab.search_entry.set_text(history_state)
             history_tab.search_query = history_state.lower().strip()
             history_tab.refresh()
 
@@ -333,7 +363,7 @@ class LDownloaderApp(tk.Tk):
         for child in self.winfo_children():
             child.destroy()
         self._build_layout()
-        self.btn_theme.config(text="Açık tema" if next_theme == "dark" else "Koyu tema")
+        self.btn_theme.config(text="☀" if next_theme == "dark" else "🌙")
         self._restore_layout_state(state)
         self._update_system_status()
 
@@ -357,16 +387,21 @@ class LDownloaderApp(tk.Tk):
             js_ok, _, _ = get_js_status()
 
             def _apply():
+                if not self.lbl_sys_status.winfo_exists():
+                    return
                 if yt_ok and ff_ok and js_ok:
-                    self.lbl_sys_status.config(text="● Motorlar Aktif (Deno + FFmpeg)", fg=SUCCESS)
+                    self.lbl_sys_status.config(text="● Sistem Hazır", fg=SUCCESS)
                 elif yt_ok and ff_ok:
-                    self.lbl_sys_status.config(text="● Motorlar Aktif", fg=SUCCESS)
+                    self.lbl_sys_status.config(text="● Hazır", fg=SUCCESS)
                 elif yt_ok and not ff_ok:
                     self.lbl_sys_status.config(text="● FFmpeg Eksik", fg=WARNING)
                 else:
                     self.lbl_sys_status.config(text="● yt-dlp Eksik", fg=ERROR)
 
-            self.after(0, _apply)
+            try:
+                self.after(0, _apply)
+            except Exception:
+                pass
 
         threading.Thread(target=_worker, daemon=True).start()
 
@@ -446,7 +481,7 @@ class LDownloaderApp(tk.Tk):
             messagebox.showerror("Hata", f"Hedef klasör kullanılamıyor:\n{e}", parent=self)
             return False
 
-    def start_batch_download(self, urls, out_dir, options, status_cb):
+    def start_batch_download(self, items, out_dir, options, status_cb):
         if engine.is_running or self._batch_running:
             messagebox.showinfo("Bilgi", "Zaten devam eden bir indirme var.", parent=self)
             return
@@ -467,23 +502,33 @@ class LDownloaderApp(tk.Tk):
         options["embed_subtitles"] = config.get("embed_subtitles", False)
         options["subtitle_lang"] = config.get("subtitle_lang", "tr,en")
         options["concurrent_fragments"] = config.get("concurrent_fragments", 4)
+        options["use_download_archive"] = config.get("use_download_archive", False)
+        options["sponsorblock_remove"] = config.get("sponsorblock_remove", False)
+        options["sponsorblock_cats"] = config.get("sponsorblock_cats", "sponsor,intro,outro,selfpromo,interaction")
+
+        normalized_items = [
+            item if isinstance(item, dict) else {"idx": idx, "url": item}
+            for idx, item in enumerate(items, 1)
+        ]
 
         self._batch_running = True
-        self.drawer.show(title=f"Toplu İndirme (0/{len(urls)})")
+        self.drawer.show(title=f"Toplu İndirme (0/{len(normalized_items)})")
 
         def _batch_worker():
             successes = 0
             failures = 0
             cancelled = False
-            last_processed = 0
-            for idx, u in enumerate(urls, 1):
+            last_processed_pos = 0
+            for pos, q_item in enumerate(normalized_items, 1):
                 if not self._batch_running:
                     cancelled = True
                     break
 
-                last_processed = idx
-                self.after(0, lambda i=idx: status_cb(i, "⏳ İndiriliyor..."))
-                self.after(0, lambda i=idx: self.drawer.lbl_title.config(text=f"Toplu İndirme [{i}/{len(urls)}]"))
+                last_processed_pos = pos
+                item_idx = q_item["idx"]
+                u = q_item["url"]
+                self.after(0, lambda i=item_idx: status_cb(i, "⏳ İndiriliyor..."))
+                self.after(0, lambda p=pos: self.drawer.lbl_title.config(text=f"Toplu İndirme [{p}/{len(normalized_items)}]"))
 
                 single_opts = dict(options)
                 event = threading.Event()
@@ -504,15 +549,15 @@ class LDownloaderApp(tk.Tk):
                     cmd = build_command(u, out_dir, single_opts)
                 except ValueError as e:
                     failures += 1
-                    self.after(0, lambda i=idx: status_cb(i, "❌ Hatalı ayar"))
+                    self.after(0, lambda i=item_idx: status_cb(i, "❌ Hatalı ayar"))
                     self.after(0, lambda error=str(e): self.drawer.log_line(error, "error"))
                     continue
 
-                def _start_item():
+                def _start_item(c=cmd):
                     if not self._batch_running:
                         _on_done(False, None, None, True)
                         return
-                    if not self._start_engine_raw(cmd, done_callback=_on_done):
+                    if not self._start_engine_raw(c, done_callback=_on_done):
                         _on_done(False, None, "İndirme motoru başka bir işlemle meşgul.", False)
 
                 self.after(0, _start_item)
@@ -520,27 +565,31 @@ class LDownloaderApp(tk.Tk):
 
                 if batch_success:
                     successes += 1
-                    self.after(0, lambda i=idx: status_cb(i, "✅ Tamamlandı"))
+                    self.current_download_file = batch_dest
+                    self.after(0, lambda i=item_idx: status_cb(i, "✅ Tamamlandı"))
                     history.add(os.path.basename(batch_dest or u), u, batch_dest, single_opts["format"])
+                    if "history" in self.tabs:
+                        self.after(0, self.tabs["history"].refresh)
                 elif batch_cancelled:
                     cancelled = True
-                    self.after(0, lambda i=idx: status_cb(i, "⛔ İptal edildi"))
+                    self.after(0, lambda i=item_idx: status_cb(i, "⛔ İptal edildi"))
                     break
                 else:
                     failures += 1
-                    self.after(0, lambda i=idx: status_cb(i, "❌ Hata"))
+                    self.after(0, lambda i=item_idx: status_cb(i, "❌ Hata"))
                     if batch_error:
                         self.after(0, lambda error=batch_error: self.drawer.log_line(error, "error"))
 
             if cancelled:
-                for idx in range(last_processed + 1, len(urls) + 1):
-                    self.after(0, lambda i=idx: status_cb(i, "⏭ Atlandı"))
+                for rem in normalized_items[last_processed_pos:]:
+                    self.after(0, lambda i=rem["idx"]: status_cb(i, "⏭ Atlandı"))
             self._batch_running = False
-            overall_success = successes == len(urls) and not cancelled
+            overall_success = successes == len(normalized_items) and not cancelled
             self.after(
                 0,
                 lambda: self.drawer.on_complete_status(
                     overall_success,
+                    output_path=self.current_download_file,
                     error_msg=f"{successes} başarılı, {failures} hatalı." if failures else None,
                     cancelled=cancelled
                 )

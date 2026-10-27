@@ -1,56 +1,57 @@
 import sys
+import ctypes
 from tkinter import ttk
 
 _PALETTES = {
     "dark": {
-        "BG": "#11141C",
-        "SURFACE": "#191E29",
-        "SURFACE_LIGHT": "#242B39",
-        "SURFACE_HOVER": "#30394A",
-        "ENTRY_BG": "#141923",
-        "BORDER": "#2B3444",
-        "BORDER_FOCUS": "#9B8CFF",
-        "ACCENT": "#7967F2",
-        "ACCENT_LIGHT": "#B6A9FF",
-        "ACCENT_HOVER": "#6857D8",
-        "ACCENT_MUTED": "#302A4A",
-        "ACCENT_GRADIENT": "#9B8CFF",
-        "TEXT": "#F1F3F8",
-        "SUBTEXT": "#A1AABD",
-        "MUTED": "#727D90",
-        "SUCCESS": "#42C99A",
-        "SUCCESS_HOVER": "#2DAB7F",
-        "WARNING": "#F2B861",
-        "ERROR": "#F07883",
-        "DANGER_HOVER": "#D45C69",
-        "TAB_BG": "#151923",
-        "TAB_ACTIVE": "#302A4A",
-        "TAB_HOVER": "#222837",
+        "BG": "#0D1017",
+        "SURFACE": "#151923",
+        "SURFACE_LIGHT": "#1E2433",
+        "SURFACE_HOVER": "#283044",
+        "ENTRY_BG": "#10141D",
+        "BORDER": "#252D3D",
+        "BORDER_FOCUS": "#8B7CFF",
+        "ACCENT": "#6C5CE7",
+        "ACCENT_LIGHT": "#B2A4FF",
+        "ACCENT_HOVER": "#5A4AD1",
+        "ACCENT_MUTED": "#23203F",
+        "ACCENT_GRADIENT": "#8B7CFF",
+        "TEXT": "#F3F5FA",
+        "SUBTEXT": "#9BA5B8",
+        "MUTED": "#667185",
+        "SUCCESS": "#2ED573",
+        "SUCCESS_HOVER": "#25B360",
+        "WARNING": "#FFA502",
+        "ERROR": "#FF5252",
+        "DANGER_HOVER": "#E04040",
+        "TAB_BG": "#11151E",
+        "TAB_ACTIVE": "#23203F",
+        "TAB_HOVER": "#1B2130",
     },
     "light": {
-        "BG": "#F4F6FA",
+        "BG": "#F1F4F9",
         "SURFACE": "#FFFFFF",
-        "SURFACE_LIGHT": "#F1F4F9",
-        "SURFACE_HOVER": "#E8EDF5",
-        "ENTRY_BG": "#F8FAFC",
-        "BORDER": "#E2E7EF",
-        "BORDER_FOCUS": "#7774E8",
-        "ACCENT": "#5B59D6",
-        "ACCENT_LIGHT": "#514FC7",
-        "ACCENT_HOVER": "#4846B8",
-        "ACCENT_MUTED": "#EFEEFF",
-        "ACCENT_GRADIENT": "#7774E8",
-        "TEXT": "#202938",
-        "SUBTEXT": "#667085",
-        "MUTED": "#98A2B3",
-        "SUCCESS": "#16835D",
-        "SUCCESS_HOVER": "#116B4B",
-        "WARNING": "#A96C12",
-        "ERROR": "#D04452",
-        "DANGER_HOVER": "#B83240",
+        "SURFACE_LIGHT": "#E9EEF6",
+        "SURFACE_HOVER": "#DCE4F0",
+        "ENTRY_BG": "#F7F9FC",
+        "BORDER": "#D8E0EC",
+        "BORDER_FOCUS": "#635BFF",
+        "ACCENT": "#5850EC",
+        "ACCENT_LIGHT": "#4338CA",
+        "ACCENT_HOVER": "#463FD4",
+        "ACCENT_MUTED": "#ECEBFF",
+        "ACCENT_GRADIENT": "#635BFF",
+        "TEXT": "#111827",
+        "SUBTEXT": "#4B5563",
+        "MUTED": "#8E99AB",
+        "SUCCESS": "#10B981",
+        "SUCCESS_HOVER": "#059669",
+        "WARNING": "#D97706",
+        "ERROR": "#EF4444",
+        "DANGER_HOVER": "#DC2626",
         "TAB_BG": "#FFFFFF",
-        "TAB_ACTIVE": "#EFEEFF",
-        "TAB_HOVER": "#F5F5FF",
+        "TAB_ACTIVE": "#ECEBFF",
+        "TAB_HOVER": "#F3F4FF",
     },
 }
 
@@ -58,15 +59,31 @@ _PALETTE_NAMES = tuple(_PALETTES["dark"])
 for _name, _value in _PALETTES["dark"].items():
     globals()[_name] = _value
 
-FONT_HERO = ("Segoe UI", 22, "bold")
-FONT_TITLE = ("Segoe UI", 15, "bold")
-FONT_SUBTITLE = ("Segoe UI", 12, "bold")
+FONT_HERO = ("Segoe UI", 20, "bold")
+FONT_TITLE = ("Segoe UI", 14, "bold")
+FONT_SUBTITLE = ("Segoe UI", 11, "bold")
 FONT_REGULAR = ("Segoe UI", 10)
 FONT_BOLD = ("Segoe UI", 10, "bold")
 FONT_SMALL = ("Segoe UI", 9)
 FONT_SMALL_BOLD = ("Segoe UI", 9, "bold")
 FONT_STAT = ("Segoe UI", 11, "bold")
 FONT_MONO = ("Consolas", 9)
+
+
+def apply_windows_titlebar(root, is_dark=True):
+    """Windows 10/11 pencere başlık çubuğunu karanlık/aydınlık temaya uyarlar."""
+    if sys.platform != "win32":
+        return
+    try:
+        root.update_idletasks()
+        hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+        value = ctypes.c_int(1 if is_dark else 0)
+        # DWMWA_USE_IMMERSIVE_DARK_MODE = 20 (Windows 11 & Win10 20H1+)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd, 20, ctypes.byref(value), ctypes.sizeof(value)
+        )
+    except Exception:
+        pass
 
 
 def apply_theme(root, mode="dark"):
@@ -82,6 +99,7 @@ def apply_theme(root, mode="dark"):
                 if name in namespace:
                     namespace[name] = value
     root.configure(bg=palette["BG"])
+    apply_windows_titlebar(root, is_dark=(mode == "dark"))
 
     style = ttk.Style(root)
     style.theme_use("clam")
@@ -93,7 +111,10 @@ def apply_theme(root, mode="dark"):
         "Custom.Horizontal.TProgressbar",
         troughcolor=SURFACE_LIGHT,
         background=ACCENT,
-        thickness=8,
+        lightcolor=ACCENT_GRADIENT,
+        darkcolor=ACCENT,
+        bordercolor=SURFACE_LIGHT,
+        thickness=10,
         borderwidth=0,
     )
     style.configure(
@@ -103,6 +124,7 @@ def apply_theme(root, mode="dark"):
         arrowcolor=SUBTEXT,
         borderwidth=0,
         relief="flat",
+        width=10,
     )
     style.map(
         "Vertical.TScrollbar",
@@ -117,8 +139,8 @@ def apply_theme(root, mode="dark"):
         bordercolor=BORDER,
         lightcolor=BORDER,
         darkcolor=BORDER,
-        arrowcolor=ACCENT,
-        padding=(9, 7),
+        arrowcolor=ACCENT_LIGHT,
+        padding=(10, 7),
         relief="flat",
     )
     style.map(
@@ -127,6 +149,7 @@ def apply_theme(root, mode="dark"):
         foreground=[("readonly", TEXT), ("disabled", MUTED)],
         selectbackground=[("readonly", ENTRY_BG)],
         selectforeground=[("readonly", TEXT)],
+        bordercolor=[("focus", BORDER_FOCUS)],
     )
     root.option_add("*TCombobox*Listbox.background", SURFACE)
     root.option_add("*TCombobox*Listbox.foreground", TEXT)
@@ -142,7 +165,7 @@ def apply_theme(root, mode="dark"):
         bordercolor=BORDER,
         borderwidth=0,
         font=FONT_REGULAR,
-        rowheight=38,
+        rowheight=40,
     )
     style.configure(
         "Treeview.Heading",
@@ -150,7 +173,13 @@ def apply_theme(root, mode="dark"):
         foreground=SUBTEXT,
         borderwidth=0,
         font=FONT_SMALL_BOLD,
-        padding=(10, 9),
+        padding=(12, 10),
+        relief="flat",
+    )
+    style.map(
+        "Treeview.Heading",
+        background=[("active", SURFACE_HOVER)],
+        foreground=[("active", TEXT)],
     )
     style.map(
         "Treeview",

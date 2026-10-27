@@ -64,7 +64,7 @@ def fetch_thumbnail_image(url, size=(160, 90)):
     return None
 
 
-def fetch_video_metadata(url: str, cookies_args: list = None, callback=None, error_callback=None):
+def fetch_video_metadata(url: str, cookies_args: list = None, proxy: str = None, callback=None, error_callback=None):
     """Videonun temel bilgilerini arka planda çeker."""
     def _worker():
         try:
@@ -72,34 +72,56 @@ def fetch_video_metadata(url: str, cookies_args: list = None, callback=None, err
             ydl_opts = {
                 'quiet': True,
                 'no_warnings': True,
-                'extract_flat': False,
+                'extract_flat': 'in_playlist',
                 'skip_download': True,
+                'socket_timeout': 15,
             }
+            if proxy:
+                ydl_opts['proxy'] = proxy
+
             if cookies_args:
-                # Cookies args parse (örnek: --cookies-from-browser firefox veya --cookies file)
+                # Cookies args parse (örnek: --cookies-from-browser firefox[:profile] veya --cookies file)
                 for i, arg in enumerate(cookies_args):
                     if arg == "--cookies-from-browser" and i + 1 < len(cookies_args):
-                        ydl_opts['cookiesfrombrowser'] = (cookies_args[i+1],)
+                        spec = cookies_args[i + 1]
+                        if ":" in spec:
+                            b_name, b_prof = spec.split(":", 1)
+                            ydl_opts['cookiesfrombrowser'] = (b_name, b_prof)
+                        else:
+                            ydl_opts['cookiesfrombrowser'] = (spec,)
                     elif arg == "--cookies" and i + 1 < len(cookies_args):
-                        ydl_opts['cookiefile'] = cookies_args[i+1]
+                        ydl_opts['cookiefile'] = cookies_args[i + 1]
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
-                
-                # Eğer playlist ise ilk videoyu al veya genel bilgi oluştur
-                is_playlist = 'entries' in info
-                first_entry = info['entries'][0] if is_playlist and info.get('entries') else info
+                if not info:
+                    raise ValueError("Medya bilgileri alınamadı.")
 
-                title = first_entry.get("title") or info.get("title", "Bilinmeyen Başlık")
-                uploader = first_entry.get("uploader") or info.get("uploader", "Bilinmeyen Kanal")
-                duration = format_duration(first_entry.get("duration"))
+                is_playlist = info.get('_type') == 'playlist' or 'entries' in info
+                entries = list(info.get('entries') or []) if is_playlist else []
+                first_entry = entries[0] if (is_playlist and entries and isinstance(entries[0], dict)) else info
+
+                title = first_entry.get("title") or info.get("title") or "Bilinmeyen Başlık"
+                uploader = (
+                    first_entry.get("uploader")
+                    or first_entry.get("channel")
+                    or info.get("uploader")
+                    or info.get("channel")
+                    or "Bilinmeyen Kanal"
+                )
+                duration = format_duration(first_entry.get("duration") or info.get("duration"))
                 thumbnail_url = first_entry.get("thumbnail") or info.get("thumbnail")
-                resolutions = extract_resolutions(first_entry)
+                if not thumbnail_url:
+                    thumbs = first_entry.get("thumbnails") or info.get("thumbnails") or []
+                    if thumbs and isinstance(thumbs, list):
+                        thumbnail_url = thumbs[-1].get("url")
 
+                resolutions = extract_resolutions(first_entry)
                 thumb_img = fetch_thumbnail_image(thumbnail_url)
 
                 metadata = {
                     "is_playlist": is_playlist,
+                    "playlist_count": len(entries) if is_playlist else 1,
                     "title": title,
                     "uploader": uploader,
                     "duration": duration,

@@ -7,6 +7,7 @@ from ui.theme import (
 from ui.components import Card, PillButton, ModernEntry
 from core.history import history
 
+
 class HistoryTab(tk.Frame):
     def __init__(self, parent, **kwargs):
         super().__init__(parent, bg=BG, **kwargs)
@@ -15,42 +16,29 @@ class HistoryTab(tk.Frame):
         self.refresh()
 
     def _build_ui(self):
-        # ── Başlık ───────────────────────────────────────────────────
-        hdr = tk.Frame(self, bg=BG)
-        hdr.pack(fill="x", padx=32, pady=(28, 22))
+        # ── Ana Tablo ve Arama Kartı ─────────────────────────────────
+        c_table = Card(self, padx=24, pady=18)
+        c_table.pack(fill="both", expand=True, padx=32, pady=(24, 14))
 
-        tk.Label(hdr, text="İndirme geçmişi", bg=BG, fg=TEXT, font=FONT_HERO).pack(anchor="w")
-        tk.Label(hdr, text="İndirdiklerinizi bulun, açın veya kayıt konumuna gidin.",
-                 bg=BG, fg=SUBTEXT, font=FONT_REGULAR).pack(anchor="w", pady=(6, 0))
+        # Üst Araç Çubuğu
+        s_row = tk.Frame(c_table, bg=SURFACE)
+        s_row.pack(fill="x", pady=(0, 12))
 
-        # ── Arama Kartı ──────────────────────────────────────────────
-        c_search = Card(self)
-        c_search.pack(fill="x", padx=32, pady=(0, 16))
-
-        s_row = tk.Frame(c_search, bg=SURFACE)
-        s_row.pack(fill="x")
+        self.lbl_count = tk.Label(s_row, text="Geçmiş (0)", bg=SURFACE, fg=TEXT, font=FONT_BOLD)
+        self.lbl_count.pack(side="left", padx=(0, 16))
 
         self.search_var = tk.StringVar()
         self.search_entry = ModernEntry(
             s_row, textvariable=self.search_var,
-            placeholder="Başlık veya formata göre ara",
+            placeholder="🔍 Başlık, URL veya formata göre filtrele...",
             on_change=self._on_search_typed
         )
-        self.search_entry.pack(side="left", fill="x", expand=True)
+        self.search_entry.pack(side="left", fill="x", expand=True, ipady=3)
 
-        PillButton(s_row, text="Yenile", command=self.refresh, small=True, style="secondary").pack(side="left", padx=(10, 0))
-        PillButton(s_row, text="Tümünü sil", command=self._clear_all, small=True, style="danger").pack(side="left", padx=(8, 0))
+        PillButton(s_row, text="↻ Yenile", command=self.refresh, small=True, style="secondary").pack(side="left", padx=(10, 0))
+        PillButton(s_row, text="🗑 Temizle", command=self._clear_all, small=True, style="danger").pack(side="left", padx=(8, 0))
 
-        # ── Tablo Kartı ──────────────────────────────────────────────
-        c_table = Card(self)
-        c_table.pack(fill="both", expand=True, padx=32, pady=(0, 18))
-
-        t_top = tk.Frame(c_table, bg=SURFACE)
-        t_top.pack(fill="x", pady=(0, 8))
-
-        self.lbl_count = tk.Label(t_top, text="Kayıtlar (0)", bg=SURFACE, fg=SUBTEXT, font=FONT_SMALL_BOLD)
-        self.lbl_count.pack(side="left")
-
+        # Tablo
         tree_frame = tk.Frame(c_table, bg=SURFACE)
         tree_frame.pack(fill="both", expand=True)
 
@@ -62,11 +50,11 @@ class HistoryTab(tk.Frame):
         self.tree.heading("size", text="Boyut")
         self.tree.heading("status", text="Durum")
 
-        self.tree.column("date", width=120, anchor="center")
-        self.tree.column("title", width=380, anchor="w")
-        self.tree.column("format", width=100, anchor="center")
-        self.tree.column("size", width=80, anchor="center")
-        self.tree.column("status", width=90, anchor="center")
+        self.tree.column("date", width=130, anchor="center", stretch=False)
+        self.tree.column("title", width=420, anchor="w")
+        self.tree.column("format", width=130, anchor="center", stretch=False)
+        self.tree.column("size", width=90, anchor="center", stretch=False)
+        self.tree.column("status", width=100, anchor="center", stretch=False)
 
         sb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview, style="Vertical.TScrollbar")
         self.tree.configure(yscrollcommand=sb.set)
@@ -78,11 +66,12 @@ class HistoryTab(tk.Frame):
 
         # ── Alt Eylem Çubuğu ─────────────────────────────────────────
         act_bar = tk.Frame(self, bg=BG)
-        act_bar.pack(fill="x", padx=32, pady=(0, 24))
+        act_bar.pack(fill="x", padx=32, pady=(0, 20))
 
-        PillButton(act_bar, text="Dosyayı aç", command=self._play_selected, style="primary").pack(side="left", padx=(0, 10))
-        PillButton(act_bar, text="Klasörde göster", command=self._open_folder_selected, style="secondary").pack(side="left", padx=(0, 10))
-        PillButton(act_bar, text="Listeden kaldır", command=self._remove_selected, style="ghost").pack(side="left")
+        PillButton(act_bar, text="▶ Dosyayı Aç / Oynat", command=self._play_selected, style="primary").pack(side="left", padx=(0, 10))
+        PillButton(act_bar, text="📁 Klasörde Göster", command=self._open_folder_selected, style="secondary").pack(side="left", padx=(0, 10))
+        PillButton(act_bar, text="🔗 Bağlantıyı Kopyala", command=self._copy_url_selected, style="secondary").pack(side="left", padx=(0, 10))
+        PillButton(act_bar, text="✕ Listeden Kaldır", command=self._remove_selected, style="ghost").pack(side="left")
 
     def _on_search_typed(self, text):
         self.search_query = text.lower().strip()
@@ -94,9 +83,14 @@ class HistoryTab(tk.Frame):
 
         items = history.get_all()
         if self.search_query:
-            items = [i for i in items if self.search_query in i.get("title", "").lower() or self.search_query in i.get("format", "").lower()]
+            items = [
+                i for i in items
+                if self.search_query in i.get("title", "").lower()
+                or self.search_query in i.get("format", "").lower()
+                or self.search_query in i.get("url", "").lower()
+            ]
 
-        self.lbl_count.config(text=f"Kayıtlar ({len(items)})")
+        self.lbl_count.config(text=f"Geçmiş ({len(items)})")
 
         for it in items:
             status_text = "✅ Başarılı" if it.get("status") == "completed" else "❌ Hata"
@@ -130,6 +124,13 @@ class HistoryTab(tk.Frame):
         if it:
             if not history.show_in_folder(it.get("path")):
                 messagebox.showerror("Hata", f"Hedef klasör açılamadı:\n{it.get('path')}", parent=self)
+
+    def _copy_url_selected(self):
+        it = self._get_selected_item()
+        if it and it.get("url"):
+            self.clipboard_clear()
+            self.clipboard_append(it["url"])
+            messagebox.showinfo("Kopyalandı", "Medya bağlantısı panoya kopyalandı.", parent=self)
 
     def _remove_selected(self):
         sel = self.tree.selection()

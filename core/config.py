@@ -23,9 +23,9 @@ def get_data_dir():
 
 def get_bin_dir():
     """Taşınabilir yt-dlp.exe ve ffmpeg.exe ikililerinin saklandığı dizin."""
-    # Öncelik 1: Uygulama çalışma dizinindeki bin/
+    # Öncelik 1: Uygulama çalışma dizinindeki bin/ (yazılabilirse veya içinde araç varsa)
     local_bin = os.path.join(get_app_dir(), 'bin')
-    if os.path.exists(local_bin):
+    if os.path.isdir(local_bin) and os.access(local_bin, os.W_OK):
         return local_bin
     
     # Öncelik 2: AppData altındaki bin/
@@ -53,7 +53,10 @@ class ConfigManager:
         "auto_fetch_metadata": True,
         "speed_limit": "",
         "proxy": "",
-        "ignore_errors": True
+        "ignore_errors": True,
+        "use_download_archive": False,
+        "sponsorblock_remove": False,
+        "sponsorblock_cats": "sponsor,intro,outro,selfpromo,interaction"
     }
 
     def __init__(self):
