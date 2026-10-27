@@ -1,0 +1,23 @@
+# PyInstaller & Build outputs
+build/
+dist/
+
+# Python temporary and cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Runtime logs and cookies
+temp.txt
+cookies.txt
+github-recovery-codes.txt
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Redundant local logs and utilities
+yapilan_islemler.txt
+ytdlp.bat
+make_icon.py

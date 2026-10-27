@@ -1,0 +1,330 @@
+import os
+import sys
+import re
+import subprocess
+import threading
+from core.dependencies import find_executable, get_ffmpeg_dir
+from core.diagnostics import diagnose
+
+class DownloadEngine:
+    _PROGRESS_RE = re.compile(
+        r"\[PROGRESS\]\s*(?P<pct>[\d.]+)(?:%\s*)?\|\s*(?P<speed>.*?)\s*\|\s*(?P<total>.*?)\s*\|\s*(?P<eta>.*)"
+    )
+    _DL_RE = re.compile(
+        r"\[download\]\s+(?P<pct>[\d.]+)%\s+of\s+~?(?P<total>\S+)\s+"
+        r"at\s+(?P<speed>.*?)\s+ETA\s+(?P<eta>\S+)"
+    )
+    _DEST_RE = re.compile(
+        r"\[(?:download|Merger|ExtractAudio|FixupM3u8)\]\s+(?:Destination:\s+|Merging formats into\s+\"|Writing video subtitles to:\s+)(?P<path>[^\"]+)"
+    )
+
+    def __init__(self):
+        self._proc = None
+        self._running = False
+        self._cancelled = False
+        self._current_file = None
+        self._lock = threading.Lock()
+
+    @property
+    def is_running(self):
+        return self._running
+
+    def cancel(self):
+        """Devam eden indirmeyi ve tüm alt süreç ağacını güvenle sonlandırır."""
+        with self._lock:
+            if not self._running or not self._proc:
+                return
+            self._cancelled = True
+            try:
+                if sys.platform == "win32":
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(self._proc.pid)],
+                        creationflags=subprocess.CREATE_NO_WINDOW,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+                else:
+                    self._proc.kill()
+            except Exception:
+                pass
+
+    def start_download(self, cmd_args, callbacks):
+        """
+        İndirmeyi arka planda başlatır.
+        callbacks dict:
+            - on_progress(pct, speed, total, eta)
+            - on_log(line, tag)
+            - on_status(msg)
+            - on_complete(success, output_path, error_msg)
+        """
+        with self._lock:
+            if self._running:
+                return False
+            self._running = True
+            self._cancelled = False
+            self._current_file = None
+
+        thread = threading.Thread(target=self._worker, args=(cmd_args, callbacks), daemon=True)
+        thread.start()
+        return True
+
+    def _worker(self, cmd_args, cb):
+        rc = -1
+        error_message = None
+        last_destination = None
+
+        try:
+            env = os.environ.copy()
+            env["PYTHONIOENCODING"] = "utf-8"
+            from core.config import get_bin_dir
+            b_dir = get_bin_dir()
+            if b_dir and b_dir not in env.get("PATH", ""):
+                env["PATH"] = f"{b_dir};{env.get('PATH', '')}"
+
+            flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+            self._proc = subprocess.Popen(
+                cmd_args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=flags,
+                bufsize=1,
+                env=env
+            )
+
+            for line in iter(self._proc.stdout.readline, ''):
+                line = line.rstrip()
+                if not line:
+                    continue
+
+                # 1. Dosya yolu yakalama
+                m_dest = self._DEST_RE.search(line)
+                if m_dest:
+                    dest = m_dest.group("path").strip().strip('"')
+                    if not dest.endswith((".part", ".ytdl")):
+                        last_destination = dest
+                        self._current_file = dest
+
+                # 2. İlerleme ayrıştırma
+                parsed = self._parse_progress(line, cb.get("on_progress"))
+
+                # 3. Akıllı Hata Teşhisi
+                diag = diagnose(line)
+                if diag:
+                    if cb.get("on_log"):
+                        cb["on_log"](f"💡 {diag['title']}: {diag['solution']}", "accent")
+
+                # 4. Log etiketi belirleme
+                tag = "info"
+                if "ERROR:" in line:
+                    tag = "error"
+                    error_message = line
+                elif "WARNING:" in line:
+                    tag = "warn"
+                elif "[download] 100%" in line or "100% of" in line:
+                    tag = "success"
+
+                if cb.get("on_log"):
+                    cb["on_log"](line, tag)
+
+            self._proc.wait()
+            rc = self._proc.returncode
+
+        except Exception as ex:
+            error_message = str(ex)
+            if cb.get("on_log"):
+                cb["on_log"](f"❌ Kritik Hata: {ex}", "error")
+
+        finally:
+            with self._lock:
+                self._running = False
+                self._proc = None
+
+            success = (rc == 0 and not self._cancelled)
+            if cb.get("on_complete"):
+                cb["on_complete"](success, last_destination or self._current_file, error_message, self._cancelled)
+
+    def _parse_progress(self, line, on_progress):
+        if not on_progress:
+            return False
+
+        # Özel template kontrolü
+        m = self._PROGRESS_RE.search(line)
+        if m:
+            try:
+                pct = float(m.group("pct").strip())
+                speed = m.group("speed").strip()
+                total = m.group("total").strip()
+                eta = m.group("eta").strip()
+
+                speed = "—" if not speed or any(x in speed.lower() for x in ["unknown", "na", "—"]) else speed
+                total = "—" if not total or any(x in total.lower() for x in ["unknown", "na", "—"]) else total
+                eta = "—" if not eta or any(x in eta.lower() for x in ["unknown", "na", "—"]) else eta
+
+                on_progress(pct, speed, total, eta)
+                return True
+            except Exception:
+                pass
+
+        # Standart yt-dlp ilerleme satırı
+        m = self._DL_RE.search(line)
+        if m:
+            try:
+                pct = float(m.group("pct"))
+                total = m.group("total")
+                speed = m.group("speed").strip()
+                eta = m.group("eta").strip()
+                on_progress(pct, speed, total, eta)
+                return True
+            except Exception:
+                pass
+
+        return False
+
+
+def build_command(url, output_dir, options):
+    """
+    yt-dlp için tüm seçenekleri birleştirip komut listesini üretir.
+    options alanları:
+        - mode: "single" veya "playlist"
+        - media_type: "video" veya "audio"
+        - format: "mp4", "mkv", "webm", "mp3", "m4a", "flac", "wav" vb.
+        - quality: "Best Quality (En İyi)" veya "1080p", "720p" / "320 kbps"
+        - cookies_args: list
+        - embed_subtitles: bool
+        - subtitle_lang: str
+        - embed_thumbnail: bool
+        - add_metadata: bool
+        - concurrent_fragments: int
+        - playlist_start: str
+        - playlist_end: str
+        - ignore_errors: bool
+        - speed_limit: str
+        - proxy: str
+    """
+    ytdlp_exe = find_executable("yt-dlp") or "yt-dlp"
+    cmd = [ytdlp_exe, "--newline"]
+
+    # Yerel FFmpeg kontrolü
+    ffmpeg_dir = get_ffmpeg_dir()
+    if ffmpeg_dir:
+        cmd += ["--ffmpeg-location", ffmpeg_dir]
+
+    # Çerezler
+    cookies_args = options.get("cookies_args") or []
+    cmd.extend(cookies_args)
+
+    media_type = options.get("media_type", "video")
+    out_format = options.get("format", "mp4" if media_type == "video" else "mp3").lower()
+    quality = options.get("quality", "Best Quality (En İyi)")
+
+    # Video / Ses Formatı Seçimi
+    if media_type == "video":
+        if "Best" in quality:
+            if out_format == "mp4":
+                cmd += ["-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv+ba/b", "--merge-output-format", "mp4"]
+            elif out_format == "mkv":
+                cmd += ["-f", "bv*+ba/b", "--merge-output-format", "mkv"]
+            elif out_format == "webm":
+                cmd += ["-f", "bv*[ext=webm]+ba[ext=webm]/b[ext=webm]/bv+ba/b", "--merge-output-format", "webm"]
+            else:
+                cmd += ["-f", "bv*+ba/b", "--merge-output-format", out_format]
+        else:
+            height = re.search(r"\d+", quality)
+            num_h = height.group(0) if height else "1080"
+            if out_format == "mp4":
+                cmd += [
+                    "-f", f"bestvideo[height<={num_h}][ext=mp4]+bestaudio[ext=m4a]/best[height<={num_h}]",
+                    "--merge-output-format", "mp4"
+                ]
+            else:
+                cmd += [
+                    "-f", f"bestvideo[height<={num_h}]+bestaudio/best[height<={num_h}]",
+                    "--merge-output-format", out_format
+                ]
+    else:
+        # Audio indirme
+        cmd += ["-x", "--audio-format", out_format]
+        if "Best" in quality:
+            cmd += ["--audio-quality", "0"]
+        else:
+            bitrate = re.search(r"\d+", quality)
+            num_b = bitrate.group(0) if bitrate else "320"
+            cmd += ["--audio-quality", f"{num_b}k"]
+
+    # Gelişmiş Seçenekler
+    if options.get("embed_thumbnail", True):
+        cmd.append("--embed-thumbnail")
+
+    if options.get("add_metadata", True):
+        cmd.append("--add-metadata")
+
+    if options.get("embed_subtitles"):
+        langs = options.get("subtitle_lang", "tr,en")
+        cmd += ["--write-subs", "--write-auto-subs", "--sub-langs", langs, "--embed-subs"]
+
+    try:
+        concurrency = int(options.get("concurrent_fragments", 4))
+    except (TypeError, ValueError) as ex:
+        raise ValueError("Parça sayısı 1 ile 16 arasında bir tam sayı olmalıdır.") from ex
+    if not 1 <= concurrency <= 16:
+        raise ValueError("Parça sayısı 1 ile 16 arasında olmalıdır.")
+    if concurrency > 1:
+        cmd += ["--concurrent-fragments", str(concurrency)]
+
+    if options.get("mode") == "playlist" and options.get("ignore_errors", True):
+        cmd.append("--ignore-errors")
+
+    speed_limit = options.get("speed_limit")
+    if speed_limit:
+        cmd += ["--limit-rate", speed_limit]
+
+    proxy = options.get("proxy")
+    if proxy:
+        cmd += ["--proxy", proxy]
+
+    # Playlist aralığı
+    if options.get("mode") == "playlist":
+        playlist_range = playlist_items_range(
+            options.get("playlist_start"),
+            options.get("playlist_end")
+        )
+        if playlist_range:
+            cmd += ["--playlist-items", playlist_range]
+        cmd.append("--yes-playlist")
+        cmd += ["-o", os.path.join(output_dir, "%(playlist_title)s", "%(playlist_index)s - %(title)s.%(ext)s")]
+    else:
+        cmd.append("--no-playlist")
+        cmd += ["-o", os.path.join(output_dir, "%(title)s.%(ext)s")]
+
+    # Kararlı ilerleme şablonu
+    cmd += [
+        "--progress-template",
+        "download:[PROGRESS] %(progress._percent_str)s | %(progress._speed_str)s | %(progress._total_bytes_str)s | %(progress._eta_str)s"
+    ]
+
+    cmd.append(url)
+    return cmd
+
+engine = DownloadEngine()
+
+
+def playlist_items_range(start, end):
+    """Validate playlist indexes and return yt-dlp's playlist-items value."""
+    start = str(start or "").strip()
+    end = str(end or "").strip()
+    if start and not start.isdigit():
+        raise ValueError("Başlangıç sırası pozitif bir tam sayı olmalıdır.")
+    if end and not end.isdigit():
+        raise ValueError("Bitiş sırası pozitif bir tam sayı olmalıdır.")
+    if start and int(start) < 1:
+        raise ValueError("Başlangıç sırası en az 1 olmalıdır.")
+    if end and int(end) < 1:
+        raise ValueError("Bitiş sırası en az 1 olmalıdır.")
+    if start and end and int(end) < int(start):
+        raise ValueError("Bitiş sırası başlangıç sırasından küçük olamaz.")
+    if start or end:
+        return f"{start or '1'}:{end}"
+    return None
