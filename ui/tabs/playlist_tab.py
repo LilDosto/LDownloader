@@ -4,14 +4,15 @@ from ui.theme import (
     BG, SURFACE, SURFACE_LIGHT, ENTRY_BG, BORDER, ACCENT, ACCENT_LIGHT, TEXT, SUBTEXT,
     FONT_HERO, FONT_TITLE, FONT_REGULAR, FONT_BOLD, FONT_SMALL, FONT_SMALL_BOLD
 )
-from ui.components import Card, PillButton, PillChip, ModernEntry, SegmentedPill, ScrollableFrame
+from ui.components import Card, CookieNoticeBanner, PillButton, PillChip, ModernEntry, SegmentedPill, ScrollableFrame
 from core.config import config
 
 
 class PlaylistTab(tk.Frame):
-    def __init__(self, parent, on_download_requested=None, **kwargs):
+    def __init__(self, parent, on_download_requested=None, on_open_settings=None, **kwargs):
         super().__init__(parent, bg=BG, **kwargs)
         self.on_download_requested = on_download_requested
+        self.on_open_settings = on_open_settings
         self._build_ui()
 
     def _build_ui(self):
@@ -19,9 +20,13 @@ class PlaylistTab(tk.Frame):
         self.scroll_container.pack(fill="both", expand=True)
         scroll_frame = self.scroll_container.inner
 
+        # ── Üst Çerez Bilgilendirme Banner'ı ────────────────────────
+        self.cookie_banner = CookieNoticeBanner(scroll_frame, on_open_settings=self.on_open_settings)
+        self.cookie_banner.pack(fill="x", padx=32, pady=(16, 0))
+
         # ── Ana Çalışma Kartı ────────────────────────────────────────
         main_card = Card(scroll_frame, padx=24, pady=20)
-        main_card.pack(fill="x", padx=32, pady=(24, 14))
+        main_card.pack(fill="x", padx=32, pady=(12, 14))
 
         # 1. URL Satırı
         tk.Label(main_card, text="Oynatma Listesi Bağlantısı", bg=SURFACE, fg=TEXT, font=FONT_BOLD).pack(anchor="w")

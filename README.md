@@ -1,4 +1,4 @@
-# LDownloader v3.1.0 🎬🎵
+# LDownloader v3.2.0 🎬🎵
 
 **LDownloader**, Python, Tkinter ve `yt-dlp` tabanlı, koyu temalı bir Windows masaüstü video ve ses indirme uygulamasıdır. Kullanılabilir platformlar ve formatlar, kaynak içeriğe ve `yt-dlp` desteğine bağlıdır.
 
@@ -33,8 +33,9 @@
 * **Kapak Resmi ve Metadata**: İsteğe bağlı olarak kapak görseli ve metadata, desteklenen formatlara eklenir.
 
 ### 7. 🍪 Zen Browser & Modern Çerez (Cookies) Yönetimi
+* **Önemli Çerez Bildirimi**: YouTube oturum çerezleri en fazla **30 dakikada bir** yenilenmelidir. Windows App-Bound güvenlik koruması sebebiyle Chromium tabanlı tarayıcılardan (Chrome, Edge, Brave vb.) doğrudan otomatik çerez çekimi kısıtlıdır; Firefox, Zen Browser veya `cookies.txt` eklentisi önerilir.
 * Yaş kısıtlamalı, gizli veya YouTube 403 engeline takılan videolarda oturum çerezlerinizi tek tıkla aktarın:
-  * **Desteklenen tarayıcı seçenekleri**: Zen Browser, Firefox, Chrome, Microsoft Edge, Brave, Opera, Vivaldi, Chromium. Tarayıcı sürümü, profil konumu ve işletim sistemi izinleri nedeniyle doğrudan çerez aktarımı her sistemde çalışmayabilir.
+  * **Desteklenen tarayıcı seçenekleri**: Zen Browser, Firefox, Chrome, Microsoft Edge, Brave, Opera, Vivaldi, Chromium.
   * İsteğe bağlı manuel `cookies.txt` yükleme desteği.
 
 ### 8. 📋 Gelişmiş Playlist İndirme

@@ -88,6 +88,27 @@ class SettingsTab(tk.Frame):
         )
         self.ck_seg.pack(side="right")
 
+        # Çerez Güvenlik ve Süre Uyarısı
+        ck_notice = tk.Frame(c_ck, bg=ACCENT_MUTED, highlightthickness=1, highlightbackground=BORDER, padx=12, pady=10)
+        ck_notice.pack(fill="x", pady=(12, 4))
+
+        notice_header = tk.Frame(ck_notice, bg=ACCENT_MUTED)
+        notice_header.pack(fill="x")
+        tk.Label(notice_header, text="⚠️", bg=ACCENT_MUTED, font=("Segoe UI", 10)).pack(side="left", padx=(0, 6))
+        tk.Label(
+            notice_header,
+            text="Önemli Çerez & Güvenlik Koruması Bildirimi",
+            bg=ACCENT_MUTED, fg=ACCENT_LIGHT, font=FONT_SMALL_BOLD
+        ).pack(side="left")
+
+        tk.Label(
+            ck_notice,
+            text="• YouTube oturum çerezleri güvenlik sebebiyle en fazla 30 dakikada bir yenilenmelidir.\n"
+                 "• Windows App-Bound koruması sebebiyle Chromium tabanlı tarayıcılardan (Chrome, Edge, Brave, Opera vb.) otomatik çerez çekimi geçici olarak desteklenmemektedir.\n"
+                 "• Çerezle indirme için Firefox, Zen Browser profillerini kullanabilir veya tarayıcınızdan 'Get cookies.txt locally' eklentisiyle aldığınız cookies.txt dosyasını yükleyebilirsiniz.",
+            bg=ACCENT_MUTED, fg=TEXT, font=FONT_SMALL, justify="left", anchor="w"
+        ).pack(fill="x", pady=(4, 0))
+
         # Tarayıcı alanı
         self.browser_frame = tk.Frame(c_ck, bg=SURFACE)
         b_sel_row = tk.Frame(self.browser_frame, bg=SURFACE)

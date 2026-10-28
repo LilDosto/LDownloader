@@ -27,6 +27,78 @@ class Card(tk.Frame):
         )
 
 
+class CookieNoticeBanner(tk.Frame):
+    """
+    Üst kısım bilgilendirme banner'ı:
+    Oturum çerezlerinin geçerlilik süresi (maksimum 30 dk) ve Chromium güvenlik koruması uyarısını gösterir.
+    """
+    def __init__(self, parent, on_open_settings=None, dismissible=True, **kwargs):
+        super().__init__(
+            parent,
+            bg=ACCENT_MUTED,
+            highlightthickness=1,
+            highlightbackground=BORDER,
+            padx=14,
+            pady=10,
+            **kwargs
+        )
+        self.on_open_settings = on_open_settings
+
+        # Sol: İkon
+        lbl_icon = tk.Label(self, text="🍪", bg=ACCENT_MUTED, font=("Segoe UI", 12))
+        lbl_icon.pack(side="left", padx=(0, 10))
+
+        # Orta: Metin Alanı
+        text_frame = tk.Frame(self, bg=ACCENT_MUTED)
+        text_frame.pack(side="left", fill="both", expand=True)
+
+        t_title = tk.Label(
+            text_frame,
+            text="Önemli Çerez & Oturum Bilgilendirmesi",
+            bg=ACCENT_MUTED,
+            fg=ACCENT_LIGHT,
+            font=FONT_SMALL_BOLD,
+            anchor="w"
+        )
+        t_title.pack(fill="x")
+
+        t_desc = tk.Label(
+            text_frame,
+            text="YouTube oturum çerezleri en fazla 30 dakikada bir yenilenmelidir. Windows App-Bound güvenlik koruması sebebiyle Chromium tabanlı tarayıcılardan (Chrome, Edge, Brave vb.) otomatik çerez çekimi geçici olarak desteklenmemektedir. Sorunsuz indirme için Firefox, Zen Browser kullanmanız veya Ayarlar'dan 'cookies.txt' dosyasını yüklemeniz önerilir.",
+            bg=ACCENT_MUTED,
+            fg=SUBTEXT,
+            font=FONT_SMALL,
+            anchor="w",
+            justify="left",
+            wraplength=640
+        )
+        t_desc.pack(fill="x", pady=(2, 0))
+
+        # Sağ: Eylem Butonları
+        actions = tk.Frame(self, bg=ACCENT_MUTED)
+        actions.pack(side="right", padx=(8, 0))
+
+        if on_open_settings:
+            btn_sett = PillButton(
+                actions,
+                text="⚙️ Çerez Ayarları",
+                command=on_open_settings,
+                small=True,
+                style="secondary"
+            )
+            btn_sett.pack(side="left", padx=(0, 6))
+
+        if dismissible:
+            btn_close = PillButton(
+                actions,
+                text="✕",
+                command=self.destroy,
+                small=True,
+                style="ghost"
+            )
+            btn_close.pack(side="left")
+
+
 class PillButton(tk.Frame):
     """Flat, high-contrast button with a clear hover and disabled state."""
     def __init__(self, parent, text="", command=None, style="secondary", small=False, **kwargs):

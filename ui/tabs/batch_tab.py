@@ -4,21 +4,26 @@ from ui.theme import (
     BG, SURFACE, SURFACE_LIGHT, ENTRY_BG, BORDER, ACCENT, ACCENT_LIGHT, TEXT, SUBTEXT,
     FONT_HERO, FONT_TITLE, FONT_REGULAR, FONT_BOLD, FONT_SMALL, FONT_SMALL_BOLD
 )
-from ui.components import Card, PillButton, ModernEntry, SegmentedPill
+from ui.components import Card, CookieNoticeBanner, PillButton, ModernEntry, SegmentedPill
 from core.config import config
 
 
 class BatchTab(tk.Frame):
-    def __init__(self, parent, on_batch_requested=None, **kwargs):
+    def __init__(self, parent, on_batch_requested=None, on_open_settings=None, **kwargs):
         super().__init__(parent, bg=BG, **kwargs)
         self.on_batch_requested = on_batch_requested
+        self.on_open_settings = on_open_settings
         self.queue = []
         self._build_ui()
 
     def _build_ui(self):
+        # ── Üst Çerez Bilgilendirme Banner'ı ────────────────────────
+        self.cookie_banner = CookieNoticeBanner(self, on_open_settings=self.on_open_settings)
+        self.cookie_banner.pack(fill="x", padx=32, pady=(16, 0))
+
         # ── 1. Bağlantı Ekleme Kartı ────────────────────────────────
         c_input = Card(self, padx=24, pady=16)
-        c_input.pack(fill="x", padx=32, pady=(24, 12))
+        c_input.pack(fill="x", padx=32, pady=(12, 12))
 
         top = tk.Frame(c_input, bg=SURFACE)
         top.pack(fill="x")
