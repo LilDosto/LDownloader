@@ -752,6 +752,13 @@ class ContextualDownloadDrawer(tk.Frame):
     def update_stats(self, pct, speed, total, eta):
         # 0% ve 100% gibi kritik sınırları hemen göster
         if pct <= 0 or pct >= 100:
+            if self._stats_after_id:
+                try:
+                    self.after_cancel(self._stats_after_id)
+                except Exception:
+                    pass
+                self._stats_after_id = None
+            self._pending_stats = None
             self._apply_stats(pct, speed, total, eta)
             return
 

@@ -27,7 +27,7 @@ from core.dependencies import get_ytdlp_status, get_ffmpeg_status, get_js_status
 class LDownloaderApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("LDownloader v3.3.0")
+        self.title("LDownloader v3.4.0")
         self.geometry("980x660")
         self.minsize(880, 580)
         self.configure(bg=BG)
@@ -110,7 +110,7 @@ class LDownloaderApp(tk.Tk):
         if self.logo_img:
             tk.Label(brand_frame, image=self.logo_img, bg=TAB_BG).pack(side="left", padx=(0, 8))
 
-        tk.Label(brand_frame, text="LDownloader v3.3.0", font=FONT_TITLE, bg=TAB_BG, fg=TEXT).pack(side="left")
+        tk.Label(brand_frame, text="LDownloader v3.4.0", font=FONT_TITLE, bg=TAB_BG, fg=TEXT).pack(side="left")
 
         # Orta: Sekmeler
         self.nav_buttons = {}
@@ -606,23 +606,31 @@ class LDownloaderApp(tk.Tk):
 
         threading.Thread(target=_batch_worker, daemon=True).start()
 
+    def _safe_after(self, fn):
+        """Pencere kapatıldıysa TclError oluşmasını engeller."""
+        try:
+            if self.winfo_exists():
+                self.after(0, fn)
+        except Exception:
+            pass
+
     def _start_engine(self, cmd, title, url, fmt_desc):
         def _on_progress(pct, speed, total, eta):
-            self.after(0, lambda: self.drawer.update_stats(pct, speed, total, eta))
+            self._safe_after(lambda: self.drawer.update_stats(pct, speed, total, eta))
 
         def _on_log(line, tag):
-            self.after(0, lambda: self.drawer.log_line(line, tag))
+            self._safe_after(lambda: self.drawer.log_line(line, tag))
 
         def _on_status(msg):
-            self.after(0, lambda: self.drawer.set_phase(msg))
+            self._safe_after(lambda: self.drawer.set_phase(msg))
 
         def _on_complete(success, output_path, err, cancelled):
             self.current_download_file = output_path
-            self.after(0, lambda: self.drawer.on_complete_status(success, output_path, err, cancelled))
+            self._safe_after(lambda: self.drawer.on_complete_status(success, output_path, err, cancelled))
             if success:
                 history.add(title, url, output_path, fmt_desc, status="completed")
                 if "history" in self.tabs:
-                    self.after(0, self.tabs["history"].refresh)
+                    self._safe_after(self.tabs["history"].refresh)
 
         callbacks = {
             "on_progress": _on_progress,
@@ -634,13 +642,13 @@ class LDownloaderApp(tk.Tk):
 
     def _start_engine_raw(self, cmd, done_callback):
         def _on_progress(pct, speed, total, eta):
-            self.after(0, lambda: self.drawer.update_stats(pct, speed, total, eta))
+            self._safe_after(lambda: self.drawer.update_stats(pct, speed, total, eta))
 
         def _on_log(line, tag):
-            self.after(0, lambda: self.drawer.log_line(line, tag))
+            self._safe_after(lambda: self.drawer.log_line(line, tag))
 
         def _on_status(msg):
-            self.after(0, lambda: self.drawer.set_phase(msg))
+            self._safe_after(lambda: self.drawer.set_phase(msg))
 
         def _on_complete(success, output_path, err, cancelled):
             if done_callback:

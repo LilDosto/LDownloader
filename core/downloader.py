@@ -105,72 +105,81 @@ class DownloadEngine:
                 env=env
             )
 
-            for line in iter(self._proc.stdout.readline, ''):
-                line = line.rstrip()
-                if not line:
-                    continue
+            if self._proc and self._proc.stdout:
+                for line in iter(self._proc.stdout.readline, ''):
+                    line = line.rstrip()
+                    if not line:
+                        continue
 
-                if line.startswith(self._FINAL_PATH_PREFIX):
-                    final_p = line[len(self._FINAL_PATH_PREFIX):].strip().strip('"')
-                    if final_p and final_p != "NA":
-                        last_destination = final_p
-                        self._current_file = final_p
-                    continue
+                    if line.startswith(self._FINAL_PATH_PREFIX):
+                        final_p = line[len(self._FINAL_PATH_PREFIX):].strip().strip('"')
+                        if final_p and final_p != "NA":
+                            last_destination = final_p
+                            self._current_file = final_p
+                        continue
 
-                # 1. Dosya yolu yakalama
-                m_dest = self._DEST_RE.search(line) or self._ALREADY_RE.search(line)
-                if m_dest:
-                    dest = m_dest.group("path").strip().strip('"')
-                    if not dest.endswith((".part", ".ytdl", ".vtt", ".srt", ".ass", ".lrc")):
-                        last_destination = dest
-                        self._current_file = dest
+                    # 1. Dosya yolu yakalama
+                    m_dest = self._DEST_RE.search(line) or self._ALREADY_RE.search(line)
+                    if m_dest:
+                        dest = m_dest.group("path").strip().strip('"')
+                        if not dest.endswith((".part", ".ytdl", ".vtt", ".srt", ".ass", ".lrc")):
+                            last_destination = dest
+                            self._current_file = dest
 
-                # Durum / Aşama güncellemesi
-                if line.startswith("[ExtractAudio]"):
-                    if cb.get("on_status"):
-                        cb["on_status"]("Ses dönüştürülüyor...")
-                elif line.startswith("[Merger]"):
-                    if cb.get("on_status"):
-                        cb["on_status"]("Formatlar birleştiriliyor...")
-                elif line.startswith(("[EmbedThumbnail]", "[ThumbnailsConvertor]")):
-                    if cb.get("on_status"):
-                        cb["on_status"]("Kapak resmi ekleniyor...")
-                elif line.startswith("[Metadata]"):
-                    if cb.get("on_status"):
-                        cb["on_status"]("Üstveri ekleniyor...")
-                elif line.startswith("[SponsorBlock]"):
-                    if cb.get("on_status"):
-                        cb["on_status"]("Sponsorlu bölümler kesiliyor...")
-                elif line.startswith("[download] Destination:"):
-                    if cb.get("on_status"):
-                        cb["on_status"]("İndiriliyor...")
+                    # Durum / Aşama güncellemesi
+                    if line.startswith("[ExtractAudio]"):
+                        if cb.get("on_status"):
+                            cb["on_status"]("Ses dönüştürülüyor...")
+                    elif line.startswith("[Merger]"):
+                        if cb.get("on_status"):
+                            cb["on_status"]("Formatlar birleştiriliyor...")
+                    elif line.startswith(("[EmbedThumbnail]", "[ThumbnailsConvertor]")):
+                        if cb.get("on_status"):
+                            cb["on_status"]("Kapak resmi ekleniyor...")
+                    elif line.startswith("[Metadata]"):
+                        if cb.get("on_status"):
+                            cb["on_status"]("Üstveri ekleniyor...")
+                    elif line.startswith("[SponsorBlock]"):
+                        if cb.get("on_status"):
+                            cb["on_status"]("Sponsorlu bölümler kesiliyor...")
+                    elif line.startswith("[download] Destination:"):
+                        if cb.get("on_status"):
+                            cb["on_status"]("İndiriliyor...")
 
-                # 2. İlerleme ayrıştırma
-                parsed = self._parse_progress(line, cb.get("on_progress"))
+                    # 2. İlerleme ayrıştırma
+                    parsed = self._parse_progress(line, cb.get("on_progress"))
 
-                # 3. Akıllı Hata Teşhisi
-                diag = diagnose(line)
-                if diag:
-                    if cb.get("on_log"):
-                        cb["on_log"](f"💡 {diag['title']}: {diag['solution']}", "accent")
+                    # 3. Akıllı Hata Teşhisi
+                    diag = diagnose(line)
+                    if diag:
+                        if cb.get("on_log"):
+                            cb["on_log"](f"💡 {diag['title']}: {diag['solution']}", "accent")
 
-                # 4. Log etiketi belirleme
-                tag = "info"
-                if "ERROR:" in line:
-                    tag = "error"
-                    error_message = line
-                elif "WARNING:" in line:
-                    tag = "warn"
-                elif "[download] 100%" in line or "100% of" in line:
-                    tag = "success"
+                    # 4. Log etiketi belirleme
+                    tag = "info"
+                    if "ERROR:" in line:
+                        tag = "error"
+                        error_message = line
+                    elif "WARNING:" in line:
+                        tag = "warn"
+                    elif "[download] 100%" in line or "100% of" in line:
+                        tag = "success"
 
-                is_progress_line = line.startswith("[PROGRESS]") or (parsed and bool(self._DL_RE.search(line)))
-                if cb.get("on_log") and not is_progress_line:
-                    cb["on_log"](line, tag)
+                    is_progress_line = line.startswith("[PROGRESS]") or (parsed and bool(self._DL_RE.search(line)))
+                    if cb.get("on_log") and not is_progress_line:
+                        cb["on_log"](line, tag)
 
-            self._proc.wait()
-            rc = self._proc.returncode
+            if self._proc:
+                self._proc.wait()
+                rc = self._proc.returncode
 
+        except FileNotFoundError as fnf:
+            error_message = (
+                "yt-dlp veya FFmpeg sistemde bulunamadı. "
+                "Lütfen Ayarlar sekmesine giderek '⚡ Kur' butonu ile bileşenleri kurun."
+            )
+            if cb.get("on_log"):
+                cb["on_log"](f"❌ {error_message}", "error")
         except Exception as ex:
             error_message = str(ex)
             if cb.get("on_log"):
@@ -179,11 +188,17 @@ class DownloadEngine:
         finally:
             with self._lock:
                 self._running = False
+                cancelled = self._cancelled
+                if self._proc and self._proc.stdout:
+                    try:
+                        self._proc.stdout.close()
+                    except Exception:
+                        pass
                 self._proc = None
 
-            success = (rc == 0 and not self._cancelled)
+            success = (rc == 0 and not cancelled)
             if cb.get("on_complete"):
-                cb["on_complete"](success, last_destination or self._current_file, error_message, self._cancelled)
+                cb["on_complete"](success, last_destination or self._current_file, error_message, cancelled)
 
     def _parse_progress(self, line, on_progress):
         if not on_progress:
@@ -346,6 +361,8 @@ def build_command(url, output_dir, options):
     if clip_section:
         cmd += ["--download-sections", clip_section]
 
+    safe_output_dir = os.path.abspath(output_dir or os.getcwd())
+
     # Playlist aralığı
     if options.get("mode") == "playlist":
         playlist_range = playlist_items_range(
@@ -355,10 +372,10 @@ def build_command(url, output_dir, options):
         if playlist_range:
             cmd += ["--playlist-items", playlist_range]
         cmd.append("--yes-playlist")
-        cmd += ["-o", os.path.join(output_dir, "%(playlist_title)s", "%(playlist_index)s - %(title)s.%(ext)s")]
+        cmd += ["-o", os.path.join(safe_output_dir, "%(playlist_title)s", "%(playlist_index)s - %(title)s.%(ext)s")]
     else:
         cmd.append("--no-playlist")
-        cmd += ["-o", os.path.join(output_dir, "%(title)s.%(ext)s")]
+        cmd += ["-o", os.path.join(safe_output_dir, "%(title)s.%(ext)s")]
 
     # Kararlı ilerleme şablonu ve nihai dosya yolu çıktısı
     # NOT: yt-dlp'de --print bayrağı varsayılan olarak --quiet ve --no-progress modunu tetikler.

@@ -78,10 +78,14 @@ def apply_windows_titlebar(root, is_dark=True):
         root.update_idletasks()
         hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
         value = ctypes.c_int(1 if is_dark else 0)
-        # DWMWA_USE_IMMERSIVE_DARK_MODE = 20 (Windows 11 & Win10 20H1+)
-        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+        # DWMWA_USE_IMMERSIVE_DARK_MODE = 20 (Windows 11 & Win10 20H1+), 19 (Win10 1809-1909)
+        hr = ctypes.windll.dwmapi.DwmSetWindowAttribute(
             hwnd, 20, ctypes.byref(value), ctypes.sizeof(value)
         )
+        if hr != 0:
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd, 19, ctypes.byref(value), ctypes.sizeof(value)
+            )
     except Exception:
         pass
 

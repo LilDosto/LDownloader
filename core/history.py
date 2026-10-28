@@ -48,7 +48,18 @@ class HistoryManager:
         size_str = "—"
         if file_path and os.path.exists(file_path):
             try:
-                bytes_size = os.path.getsize(file_path)
+                if os.path.isdir(file_path):
+                    bytes_size = 0
+                    for root, _, files in os.walk(file_path):
+                        for f in files:
+                            fp = os.path.join(root, f)
+                            try:
+                                bytes_size += os.path.getsize(fp)
+                            except OSError:
+                                pass
+                else:
+                    bytes_size = os.path.getsize(file_path)
+
                 if bytes_size >= 1024 * 1024 * 1024:
                     size_str = f"{bytes_size / (1024*1024*1024):.2f} GB"
                 elif bytes_size >= 1024 * 1024:

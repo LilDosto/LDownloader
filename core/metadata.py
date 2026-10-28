@@ -8,6 +8,7 @@ from core.dependencies import find_executable
 _METADATA_CACHE = {}
 _CACHE_LOCK = threading.Lock()
 _MAX_CACHE_SIZE = 64
+_IN_FLIGHT = {}
 
 def format_duration(seconds):
     """Saniyeyi ss:dd veya saat:ss:dd formatına dönüştürür."""
@@ -69,8 +70,13 @@ def fetch_thumbnail_image(url, size=(160, 90)):
 
 
 def fetch_video_metadata(url: str, cookies_args: list = None, proxy: str = None, callback=None, error_callback=None):
-    """Videonun temel bilgilerini arka planda çeker (önbellek destekli)."""
+    """Videonun temel bilgilerini arka planda çeker (önbellek ve istek tekilleştirme destekli)."""
     clean_url = (url or "").strip()
+    if not clean_url:
+        if error_callback:
+            error_callback("Geçersiz URL")
+        return
+
     with _CACHE_LOCK:
         if clean_url in _METADATA_CACHE:
             cached = _METADATA_CACHE[clean_url]
@@ -78,6 +84,12 @@ def fetch_video_metadata(url: str, cookies_args: list = None, proxy: str = None,
                 # Önbellekteki veriyi anında döndür
                 threading.Thread(target=lambda: callback(cached), daemon=True).start()
             return
+
+        if clean_url in _IN_FLIGHT:
+            _IN_FLIGHT[clean_url].append((callback, error_callback))
+            return
+
+        _IN_FLIGHT[clean_url] = [(callback, error_callback)]
 
     def _worker():
         try:
@@ -149,12 +161,24 @@ def fetch_video_metadata(url: str, cookies_args: list = None, proxy: str = None,
                         # En eski kaydı temizle
                         _METADATA_CACHE.pop(next(iter(_METADATA_CACHE)))
                     _METADATA_CACHE[clean_url] = metadata
+                    listeners = _IN_FLIGHT.pop(clean_url, [])
 
-                if callback:
-                    callback(metadata)
+                for cb, _ in listeners:
+                    if cb:
+                        try:
+                            cb(metadata)
+                        except Exception:
+                            pass
 
         except Exception as ex:
-            if error_callback:
-                error_callback(str(ex))
+            err_msg = str(ex)
+            with _CACHE_LOCK:
+                listeners = _IN_FLIGHT.pop(clean_url, [])
+            for _, err_cb in listeners:
+                if err_cb:
+                    try:
+                        err_cb(err_msg)
+                    except Exception:
+                        pass
 
     threading.Thread(target=_worker, daemon=True).start()

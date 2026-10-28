@@ -1,6 +1,6 @@
 ; Inno Setup Kurulum Senaryosu - LDownloader
 #define MyAppName "LDownloader"
-#define MyAppVersion "3.3.0"
+#define MyAppVersion "3.4.0"
 #define MyAppPublisher "LilDosto"
 #define MyAppURL "https://github.com/LilDosto/LDownloader"
 #define MyAppExeName "LDownloader.exe"

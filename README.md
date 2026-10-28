@@ -1,4 +1,4 @@
-# LDownloader v3.3.0 🎬🎵
+# LDownloader v3.4.0 🎬🎵
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub Release](https://img.shields.io/github/v/release/LilDosto/LDownloader)](https://github.com/LilDosto/LDownloader/releases)
@@ -114,7 +114,7 @@ LDownloader'ı iki farklı şekilde kullanabilirsiniz:
 
 Uygulamayı ve kurulum sihirbazını yerel olarak derlemek için:
 * `build_exe.bat` dosyasına çift tıklayın veya çalıştırın:
-* Derleme sonucunda `dist/` klasöründe hem taşınabilir `LDownloader.exe` hem de `LDownloader-v3.3.0-Setup.exe` üretilecektir.
+* Derleme sonucunda `dist/` klasöründe hem taşınabilir `LDownloader.exe` hem de `LDownloader-v3.4.0-Setup.exe` üretilecektir.
 
 ---
 
