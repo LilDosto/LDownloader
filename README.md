@@ -1,4 +1,4 @@
-# LDownloader v3.2.0 🎬🎵
+# LDownloader v3.3.0 🎬🎵
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub Release](https://img.shields.io/github/v/release/LilDosto/LDownloader)](https://github.com/LilDosto/LDownloader/releases)
@@ -97,14 +97,24 @@ python main.py
 
 ---
 
-## 🛠️ Tek Tıkla EXE Olarak Derleme
+## 📦 İndirme ve Kurulum
 
-Uygulamayı tek bir Windows `.exe` dosyası haline getirmek için:
-* `build_exe.bat` dosyasına çift tıklayın veya terminalden çalıştırın:
-```bash
-pyinstaller --noconfirm ytdlp_indirici.spec
-```
-Oluşturulan taşınabilir dosya `dist/LDownloader.exe` konumunda yer alacaktır.
+LDownloader'ı iki farklı şekilde kullanabilirsiniz:
+
+1. **Kurulum Sihirbazı (Önerilen - `LDownloader-Setup.exe`):**
+   * Standart bir Windows programı gibi adım adım kurulur.
+   * Masaüstüne ve Başlat Menüsüne otomatik kısayol oluşturur.
+   * Windows Ayarları -> Yüklü Uygulamalar (Program Ekle/Kaldır) üzerinden güvenle kaldırılabilir.
+2. **Taşınabilir Sürüm (Portable - `LDownloader.exe`):**
+   * Kurulum gerektirmeden indirip doğrudan çift tıklayarak çalıştırabilirsiniz.
+
+---
+
+## 🛠️ Tek Tıkla EXE ve Kurulum Sihirbazı Derleme
+
+Uygulamayı ve kurulum sihirbazını yerel olarak derlemek için:
+* `build_exe.bat` dosyasına çift tıklayın veya çalıştırın:
+* Derleme sonucunda `dist/` klasöründe hem taşınabilir `LDownloader.exe` hem de `LDownloader-v3.3.0-Setup.exe` üretilecektir.
 
 ---
 

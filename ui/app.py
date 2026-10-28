@@ -27,7 +27,7 @@ from core.dependencies import get_ytdlp_status, get_ffmpeg_status, get_js_status
 class LDownloaderApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("LDownloader v3.2.0")
+        self.title("LDownloader v3.3.0")
         self.geometry("980x660")
         self.minsize(880, 580)
         self.configure(bg=BG)
@@ -110,7 +110,7 @@ class LDownloaderApp(tk.Tk):
         if self.logo_img:
             tk.Label(brand_frame, image=self.logo_img, bg=TAB_BG).pack(side="left", padx=(0, 8))
 
-        tk.Label(brand_frame, text="LDownloader v3.2.0", font=FONT_TITLE, bg=TAB_BG, fg=TEXT).pack(side="left")
+        tk.Label(brand_frame, text="LDownloader v3.3.0", font=FONT_TITLE, bg=TAB_BG, fg=TEXT).pack(side="left")
 
         # Orta: Sekmeler
         self.nav_buttons = {}
