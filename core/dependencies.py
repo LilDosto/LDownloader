@@ -5,6 +5,7 @@ import zipfile
 import subprocess
 import configparser
 import requests
+import time
 from core.config import get_bin_dir, get_app_dir, get_data_dir
 
 # bin/ dizinini çalışma zamanı PATH değişkeninin başına ekle
@@ -141,6 +142,7 @@ def download_file_with_progress(url: str, dest_path: str, progress_callback=None
 
     downloaded = 0
     total = int(total_length) if total_length else None
+    last_callback_time = 0.0
 
     with open(dest_path, "wb") as f:
         for chunk in response.iter_content(chunk_size=1024 * 64):
@@ -148,8 +150,11 @@ def download_file_with_progress(url: str, dest_path: str, progress_callback=None
                 f.write(chunk)
                 downloaded += len(chunk)
                 if progress_callback and total:
+                    now = time.monotonic()
                     pct = (downloaded / total) * 100
-                    progress_callback(pct, downloaded, total)
+                    if (now - last_callback_time >= 0.08) or pct >= 100:
+                        last_callback_time = now
+                        progress_callback(pct, downloaded, total)
 
 
 def install_ytdlp(progress_callback=None):

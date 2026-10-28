@@ -89,7 +89,6 @@ class ConfigManager:
             with open(temp_path, "w", encoding="utf-8") as f:
                 json.dump(self.config, f, indent=4, ensure_ascii=False)
                 f.flush()
-                os.fsync(f.fileno())
             os.replace(temp_path, self.config_path)
         except OSError:
             logger.exception("Could not save configuration to %s", self.config_path)

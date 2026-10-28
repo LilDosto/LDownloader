@@ -137,6 +137,7 @@ class BuildCommandTests(unittest.TestCase):
         )
         self.assertIn("--progress", cmd)
         self.assertIn("--no-quiet", cmd)
+        self.assertIn("--progress-delta", cmd)
         self.assertIn("--progress-template", cmd)
         self.assertIn("--print", cmd)
 

@@ -35,23 +35,28 @@ class DownloadEngine:
         return self._running
 
     def cancel(self):
-        """Devam eden indirmeyi ve tüm alt süreç ağacını güvenle sonlandırır."""
+        """Devam eden indirmeyi ve tüm alt süreç ağacını güvenle ve arayüzü dondurmadan sonlandırır."""
         with self._lock:
             if not self._running or not self._proc:
                 return
             self._cancelled = True
+            proc = self._proc
+
+        def _do_kill():
             try:
                 if sys.platform == "win32":
                     subprocess.run(
-                        ["taskkill", "/F", "/T", "/PID", str(self._proc.pid)],
+                        ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
                         creationflags=subprocess.CREATE_NO_WINDOW,
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL
                     )
                 else:
-                    self._proc.kill()
+                    proc.kill()
             except Exception:
                 pass
+
+        threading.Thread(target=_do_kill, daemon=True).start()
 
     def start_download(self, cmd_args, callbacks):
         """
@@ -358,11 +363,14 @@ def build_command(url, output_dir, options):
     # Kararlı ilerleme şablonu ve nihai dosya yolu çıktısı
     # NOT: yt-dlp'de --print bayrağı varsayılan olarak --quiet ve --no-progress modunu tetikler.
     # Bu yüzden --progress ve --no-quiet açıkça eklenmelidir ki konsol ve ilerleme çubuğu çalışsın.
+    # --progress-delta 0.15 ile ilerleme güncellemeleri optimize edilir, UI donması ve CPU aşırı yükü engellenir.
     cmd += [
         "--print",
         "after_move:[FINAL_PATH] %(filepath)s",
         "--progress",
         "--no-quiet",
+        "--progress-delta",
+        "0.15",
         "--progress-template",
         "download:[PROGRESS] %(progress._percent_str)s | %(progress._speed_str)s | %(progress._total_bytes_str)s | %(progress._eta_str)s"
     ]

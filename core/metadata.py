@@ -5,6 +5,10 @@ import requests
 from PIL import Image, ImageTk
 from core.dependencies import find_executable
 
+_METADATA_CACHE = {}
+_CACHE_LOCK = threading.Lock()
+_MAX_CACHE_SIZE = 64
+
 def format_duration(seconds):
     """Saniyeyi ss:dd veya saat:ss:dd formatına dönüştürür."""
     if not seconds:
@@ -65,7 +69,16 @@ def fetch_thumbnail_image(url, size=(160, 90)):
 
 
 def fetch_video_metadata(url: str, cookies_args: list = None, proxy: str = None, callback=None, error_callback=None):
-    """Videonun temel bilgilerini arka planda çeker."""
+    """Videonun temel bilgilerini arka planda çeker (önbellek destekli)."""
+    clean_url = (url or "").strip()
+    with _CACHE_LOCK:
+        if clean_url in _METADATA_CACHE:
+            cached = _METADATA_CACHE[clean_url]
+            if callback:
+                # Önbellekteki veriyi anında döndür
+                threading.Thread(target=lambda: callback(cached), daemon=True).start()
+            return
+
     def _worker():
         try:
             import yt_dlp
@@ -93,7 +106,7 @@ def fetch_video_metadata(url: str, cookies_args: list = None, proxy: str = None,
                         ydl_opts['cookiefile'] = cookies_args[i + 1]
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
+                info = ydl.extract_info(clean_url, download=False)
                 if not info:
                     raise ValueError("Medya bilgileri alınamadı.")
 
@@ -130,6 +143,12 @@ def fetch_video_metadata(url: str, cookies_args: list = None, proxy: str = None,
                     "resolutions": resolutions,
                     "raw_info": first_entry
                 }
+
+                with _CACHE_LOCK:
+                    if len(_METADATA_CACHE) >= _MAX_CACHE_SIZE:
+                        # En eski kaydı temizle
+                        _METADATA_CACHE.pop(next(iter(_METADATA_CACHE)))
+                    _METADATA_CACHE[clean_url] = metadata
 
                 if callback:
                     callback(metadata)

@@ -1,3 +1,4 @@
+import time
 import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
@@ -248,7 +249,7 @@ class ModernEntry(tk.Entry):
 
 
 class ScrollableFrame(tk.Frame):
-    """Dikey kaydırma (fare tekerleği destekli) sağlayan modern kapsayıcı çerçeve."""
+    """Dikey kaydırma (fare tekerleği destekli) sağlayan akıcı ve optimize modern kapsayıcı çerçeve."""
     def __init__(self, parent, **kwargs):
         super().__init__(parent, bg=BG, **kwargs)
         self.canvas = tk.Canvas(self, bg=BG, bd=0, highlightthickness=0)
@@ -260,6 +261,7 @@ class ScrollableFrame(tk.Frame):
 
         self.canvas.pack(side="left", fill="both", expand=True)
 
+        self._configure_after_id = None
         self.inner.bind("<Configure>", self._on_inner_configure)
         self.canvas.bind("<Configure>", self._on_canvas_configure)
         self.canvas.bind("<Enter>", self._bind_wheel)
@@ -275,22 +277,42 @@ class ScrollableFrame(tk.Frame):
         self.scrollbar.set(first, last)
 
     def _on_inner_configure(self, event=None):
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        if self._configure_after_id:
+            self.after_cancel(self._configure_after_id)
+        self._configure_after_id = self.after(20, self._update_scroll_region)
+
+    def _update_scroll_region(self):
+        self._configure_after_id = None
+        if self.canvas.winfo_exists():
+            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def _on_canvas_configure(self, event):
-        self.canvas.itemconfig(self._win_id, width=event.width)
+        if self.canvas.winfo_exists():
+            self.canvas.itemconfig(self._win_id, width=event.width)
 
     def _bind_wheel(self, event=None):
-        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel, add="+")
 
     def _unbind_wheel(self, event=None):
-        self.canvas.unbind_all("<MouseWheel>")
+        pass
 
     def _on_mousewheel(self, event):
-        first, last = self.canvas.yview()
-        if first <= 0.0 and last >= 1.0:
+        if not self.canvas.winfo_exists() or not self.winfo_ismapped():
             return
-        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        try:
+            x, y = self.winfo_pointerxy()
+            wx = self.winfo_rootx()
+            wy = self.winfo_rooty()
+            ww = self.winfo_width()
+            wh = self.winfo_height()
+            if not (wx <= x <= wx + ww and wy <= y <= wy + wh):
+                return
+            first, last = self.canvas.yview()
+            if float(first) <= 0.0 and float(last) >= 1.0:
+                return
+            self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        except Exception:
+            pass
 
 
 class TabButton(tk.Frame):
@@ -525,6 +547,12 @@ class ContextualDownloadDrawer(tk.Frame):
         self.on_cancel = on_cancel
         self.on_open_file = on_open_file
         self.console_open = False
+        self._log_buffer = []
+        self._log_flush_pending = False
+        self._last_stats_update = 0.0
+        self._pending_stats = None
+        self._stats_after_id = None
+        self._base_title = "İndirme"
 
         # Üst Bilgi Satırı
         top_row = tk.Frame(self, bg=SURFACE)
@@ -613,6 +641,16 @@ class ContextualDownloadDrawer(tk.Frame):
         self.speed_var.set("⚡ —")
         self.dl_var.set("📥 —")
         self.eta_var.set("⏱ —")
+        self._last_stats_update = 0.0
+        self._pending_stats = None
+        if self._stats_after_id:
+            try:
+                self.after_cancel(self._stats_after_id)
+            except Exception:
+                pass
+            self._stats_after_id = None
+        self._log_buffer.clear()
+        self._log_flush_pending = False
         if clear_logs:
             self.log_text.config(state="normal")
             self.log_text.delete("1.0", "end")
@@ -627,11 +665,12 @@ class ContextualDownloadDrawer(tk.Frame):
             self.pack(fill="x", side="bottom")
 
     def set_phase(self, phase_text):
+        if not self.winfo_exists():
+            return
         base = getattr(self, "_base_title", None)
-        if base:
-            self.lbl_title.config(text=f"⏳ {base} · {phase_text}")
-        else:
-            self.lbl_title.config(text=f"⏳ {phase_text}")
+        new_text = f"⏳ {base} · {phase_text}" if base else f"⏳ {phase_text}"
+        if self.lbl_title.cget("text") != new_text:
+            self.lbl_title.config(text=new_text)
 
     def hide(self):
         self.pack_forget()
@@ -639,6 +678,35 @@ class ContextualDownloadDrawer(tk.Frame):
             self._toggle_console()
 
     def update_stats(self, pct, speed, total, eta):
+        # 0% ve 100% gibi kritik sınırları hemen göster
+        if pct <= 0 or pct >= 100:
+            self._apply_stats(pct, speed, total, eta)
+            return
+
+        now = time.monotonic()
+        # 50ms (~20 FPS) altındaki sık çağrıları akıllıca kuyrukla (UI kilitlenmesini önler)
+        if now - self._last_stats_update >= 0.05:
+            self._last_stats_update = now
+            self._apply_stats(pct, speed, total, eta)
+        else:
+            self._pending_stats = (pct, speed, total, eta)
+            if not self._stats_after_id:
+                try:
+                    self._stats_after_id = self.after(50, self._apply_pending_stats)
+                except Exception:
+                    self._apply_stats(pct, speed, total, eta)
+
+    def _apply_pending_stats(self):
+        self._stats_after_id = None
+        if self._pending_stats:
+            p, s, t, e = self._pending_stats
+            self._pending_stats = None
+            self._last_stats_update = time.monotonic()
+            self._apply_stats(p, s, t, e)
+
+    def _apply_stats(self, pct, speed, total, eta):
+        if not self.winfo_exists():
+            return
         self.pbar["value"] = pct
         self.pct_var.set(f"{pct:.1f}%")
         self.speed_var.set(f"⚡ {speed}")
@@ -646,6 +714,15 @@ class ContextualDownloadDrawer(tk.Frame):
         self.eta_var.set(f"⏱ {eta}")
 
     def on_complete_status(self, success, output_path=None, error_msg=None, cancelled=False):
+        if self._stats_after_id:
+            try:
+                self.after_cancel(self._stats_after_id)
+            except Exception:
+                pass
+            self._stats_after_id = None
+        if self._log_flush_pending:
+            self._flush_logs()
+
         self.btn_cancel.pack_forget()
         if cancelled:
             self.lbl_title.config(text="⛔ İndirme kullanıcı tarafından iptal edildi.")
@@ -663,8 +740,24 @@ class ContextualDownloadDrawer(tk.Frame):
             self.btn_close.pack(side="left", padx=(6, 0))
 
     def log_line(self, line, tag="info"):
+        self._log_buffer.append((line, tag))
+        if not self._log_flush_pending:
+            self._log_flush_pending = True
+            try:
+                self.after_idle(self._flush_logs)
+            except Exception:
+                self._flush_logs()
+
+    def _flush_logs(self):
+        self._log_flush_pending = False
+        if not self._log_buffer or not self.log_text.winfo_exists():
+            return
+        buffer = self._log_buffer
+        self._log_buffer = []
+
         self.log_text.config(state="normal")
-        self.log_text.insert("end", line + "\n", tag)
+        for line, tag in buffer:
+            self.log_text.insert("end", line + "\n", tag)
         try:
             num = int(self.log_text.index("end-1c").split(".")[0])
             if num > 1000:

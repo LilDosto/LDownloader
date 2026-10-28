@@ -36,7 +36,6 @@ class HistoryManager:
             with open(temp_path, "w", encoding="utf-8") as f:
                 json.dump(self.items, f, indent=2, ensure_ascii=False)
                 f.flush()
-                os.fsync(f.fileno())
             os.replace(temp_path, self.history_file)
         except (OSError, TypeError):
             logger.exception("Could not save download history to %s", self.history_file)

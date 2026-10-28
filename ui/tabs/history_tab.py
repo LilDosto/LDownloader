@@ -12,6 +12,7 @@ class HistoryTab(tk.Frame):
     def __init__(self, parent, **kwargs):
         super().__init__(parent, bg=BG, **kwargs)
         self.search_query = ""
+        self._search_after_id = None
         self._build_ui()
         self.refresh()
 
@@ -75,7 +76,12 @@ class HistoryTab(tk.Frame):
 
     def _on_search_typed(self, text):
         self.search_query = text.lower().strip()
-        self.refresh()
+        if self._search_after_id:
+            try:
+                self.after_cancel(self._search_after_id)
+            except Exception:
+                pass
+        self._search_after_id = self.after(120, self.refresh)
 
     def refresh(self):
         for item in self.tree.get_children():
