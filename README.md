@@ -1,5 +1,8 @@
 # LDownloader v3.2.0 🎬🎵
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/LilDosto/LDownloader)](https://github.com/LilDosto/LDownloader/releases)
+
 **LDownloader**, Python, Tkinter ve `yt-dlp` tabanlı, koyu temalı bir Windows masaüstü video ve ses indirme uygulamasıdır. Kullanılabilir platformlar ve formatlar, kaynak içeriğe ve `yt-dlp` desteğine bağlıdır.
 
 ![LDownloader Logo](assets/logo.png)
@@ -107,6 +110,6 @@ Oluşturulan taşınabilir dosya `dist/LDownloader.exe` konumunda yer alacaktır
 
 ## 📝 Lisans ve Katkı
 
-Bu proje açık kaynaklıdır. Hata bildirimleri veya yeni özellik önerileri için Pull Request gönderebilir veya Issue oluşturabilirsiniz.
+Bu proje [MIT Lisansı](LICENSE) altında lisanslanmıştır. Özgürce kullanabilir, değiştirebilir ve dağıtabilirsiniz. Hata bildirimleri veya yeni özellik önerileri için Pull Request gönderebilir veya Issue oluşturabilirsiniz.
 
 İyi indirmeler! 🚀
