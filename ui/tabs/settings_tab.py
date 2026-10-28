@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import threading
 from ui.theme import (
-    BG, SURFACE, SURFACE_LIGHT, ENTRY_BG, BORDER, ACCENT, ACCENT_LIGHT, TEXT, SUBTEXT, SUCCESS, WARNING, ERROR,
+    BG, SURFACE, SURFACE_LIGHT, ENTRY_BG, BORDER, ACCENT, ACCENT_LIGHT, ACCENT_MUTED, TEXT, SUBTEXT, SUCCESS, WARNING, ERROR,
     FONT_HERO, FONT_TITLE, FONT_REGULAR, FONT_BOLD, FONT_SMALL, FONT_SMALL_BOLD
 )
 from ui.components import Card, PillButton, PillChip, ModernEntry, SegmentedPill, ScrollableFrame
